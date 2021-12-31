@@ -3,6 +3,7 @@ import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
 import {ethers} from "hardhat";
 import {expect} from "chai";
 import {BigNumber} from "ethers";
+import {time} from '@openzeppelin/test-helpers';
 
 /* TODO: tests
 
@@ -63,9 +64,12 @@ describe.only("Farm XYZ", async () => {
       expect(farmXYZ).to.be.ok;
     })
 
-    it.only('should deposit rewards to reward pool', async () => {
-      const transaction = await farmXYZ.connect(owner).depositToRewardPool(rewardAmount);
-      expect(transaction).to.be.ok;
+    it('should deposit rewards to reward pool', async () => {
+      await rFarmXToken.connect(owner).approve(farmXYZ.address, rewardAmount);
+      await farmXYZ.connect(owner).depositToRewardPool(rewardAmount);
+
+      expect(await farmXYZ.totalRewardPool())
+          .to.eq(rewardAmount)
     })
   })
 
@@ -85,5 +89,105 @@ describe.only("Farm XYZ", async () => {
       expect(await farmXYZ.isStaking(john.address))
           .to.eq(true);
     });
+  })
+
+  describe('Unstake', async () => {
+    beforeEach(async () => {
+      await tFarmXToken.connect(john).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(john).stake(stakeAmount)
+    })
+
+    it('should unstake balance from user', async () => {
+      await farmXYZ.connect(john).unstake(stakeAmount);
+
+      const stakingBalance = await farmXYZ.stakingBalance(john.address);
+      expect(Number(stakingBalance))
+          .to.eq(0);
+
+      expect(await farmXYZ.isStaking(john.address))
+          .to.eq(false);
+    });
+  })
+
+  describe('Withdraw yield', async () => {
+    beforeEach(async () => {
+      const toTransfer = ethers.utils.parseEther("100");
+
+      await rFarmXToken.transferOwnership(farmXYZ.address);
+      await tFarmXToken.connect(john).approve(farmXYZ.address, toTransfer);
+      await farmXYZ.connect(john).stake(toTransfer);
+    })
+
+    it('should return correct yield time', async () => {
+      let timeStart = await farmXYZ.startTime(john.address)
+      expect(Number(timeStart))
+          .to.be.greaterThan(0)
+
+      // Fast-forward time
+      await time.increase(86400)
+
+      expect(await farmXYZ.calculateYieldTime(john.address))
+          .to.eq((86400))
+    })
+
+    it.only('should calculate correct yield', async () => {
+      let toTransfer = await farmXYZ.calculateYieldTotal(john.address);
+      let staked = await farmXYZ.stakingBalance(john.address)
+      console.log({staked});
+      console.log({toTransfer});
+
+      await time.increase(86400)
+      toTransfer = await farmXYZ.calculateYieldTotal(john.address)
+      console.log({toTransfer});
+
+      // TODO: calculate correct yield
+    });
+
+    it("should mint correct token amount in total supply and user", async () => {
+      await time.increase(86400)
+      // TODO: withdraw total yield from farm
+
+      let _time = await farmXYZ.calculateYieldTime(john.address)
+      let formatTime = _time.div(86400)
+      let staked = await farmXYZ.stakingBalance(john.address)
+      let bal = staked.mul(formatTime)
+      let newBal = ethers.utils.formatEther(bal.toString())
+      let expected = Number.parseFloat(newBal).toFixed(3)
+      let rewards = await farmXYZ.rewardBalance(john.address)
+      let res;
+
+      let toTransfer = await farmXYZ.calculateYieldTotal(john.address);
+      console.log('yield', {
+        toTransfer,
+        staked,
+        bal,
+        rewards,
+        expected
+      });
+      await farmXYZ.connect(john).withdrawYield()
+
+      // res = await tFarmXToken.totalSupply()
+      // let newRes = ethers.utils.formatEther(res)
+      // let formatRes = Number.parseFloat(newRes).toFixed(3).toString()
+      //
+      // expect(expected)
+      //     .to.eq(formatRes)
+      //
+      // res = await tFarmXToken.balanceOf(john.address)
+      // newRes = ethers.utils.formatEther(res)
+      // formatRes = Number.parseFloat(newRes).toFixed(3).toString()
+      //
+      // expect(expected)
+      //     .to.eq(formatRes)
+    })
+
+    it("should update yield balance when unstaked", async () => {
+      await time.increase(86400)
+      await farmXYZ.connect(john).unstake(ethers.utils.parseEther("5"))
+
+      let res = await farmXYZ.stakingBalance(john.address)
+      expect(Number(ethers.utils.formatEther(res)))
+          .to.be.approximately(95, .001)
+    })
   })
 });
