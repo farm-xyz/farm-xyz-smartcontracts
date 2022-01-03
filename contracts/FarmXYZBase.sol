@@ -45,7 +45,7 @@ contract FarmXYZBase is Ownable {
         stakeToken = _stakeToken;
         rewardToken = _rewardToken;
         apy = _apy;
-        ratePerSecond = _apy * 10**18 / (365 days);
+        ratePerSecond = _apy * 10**18 / 100 / (365 days);
     }
 
     // TODO: Add a method to update APY - should also update ratePerSecond
@@ -114,9 +114,10 @@ contract FarmXYZBase is Ownable {
         return totalTime;
     }
 
-    // TODO: Test this calculates the right yield
     function calculateYieldTotal(address user) public view returns(uint256) {
         uint256 time = calculateYieldTime(user);
+//        console.log("calc yield for %s", user);
+//        console.log("time %s balance %s ratePerSecond %s", time, stakingBalance[user], ratePerSecond);
         uint256 rawYield = (stakingBalance[user] * time * ratePerSecond) / 10**18;
         return rawYield;
     }

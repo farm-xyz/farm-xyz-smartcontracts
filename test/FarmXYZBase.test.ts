@@ -4,6 +4,7 @@ import {ethers} from "hardhat";
 import {expect} from "chai";
 import {BigNumber} from "ethers";
 import {time} from '@openzeppelin/test-helpers';
+import { formatEther } from "ethers/lib/utils";
 
 /* TODO: tests
 
@@ -130,17 +131,24 @@ describe.only("Farm XYZ", async () => {
           .to.eq((86400))
     })
 
+    function calculateCorrectYield(time:number, staked:BigNumber) {
+      const ratePerSecond = BigNumber.from(_apy).mul(BigNumber.from("10").pow(18)).div(BigNumber.from(100)).div(BigNumber.from(365*24*3600));
+      console.log('js: ratePerSecond:', ratePerSecond.toString())
+      return ratePerSecond.mul(staked).mul(BigNumber.from(time)).div(BigNumber.from("10").pow(18));
+    }
+
     it.only('should calculate correct yield', async () => {
-      let toTransfer = await farmXYZ.calculateYieldTotal(john.address);
+
+      let availableYield = await farmXYZ.calculateYieldTotal(john.address);
       let staked = await farmXYZ.stakingBalance(john.address)
-      console.log({staked});
-      console.log({toTransfer});
+      // console.log('js: t0: staked', formatEther(staked), 'yield: ', formatEther(availableYield));
 
-      await time.increase(86400)
-      toTransfer = await farmXYZ.calculateYieldTotal(john.address)
-      console.log({toTransfer});
-
-      // TODO: calculate correct yield
+      const timeStaked = 365*24*3600;
+      await time.increase(timeStaked)
+      availableYield = await farmXYZ.calculateYieldTotal(john.address)
+      let expectedYield = calculateCorrectYield(timeStaked, staked);
+      // console.log('js: t+365 days: staked', formatEther(staked), 'yield: ', formatEther(availableYield), 'expecting: ', formatEther(expectedYield));
+      expect(availableYield).to.eq(expectedYield);
     });
 
     it("should mint correct token amount in total supply and user", async () => {
