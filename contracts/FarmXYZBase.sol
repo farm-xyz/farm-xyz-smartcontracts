@@ -116,15 +116,18 @@ contract FarmXYZBase is Ownable {
 
     function calculateYieldTotal(address user) public view returns(uint256) {
         uint256 time = calculateYieldTime(user);
-//        console.log("calc yield for %s", user);
-//        console.log("time %s balance %s ratePerSecond %s", time, stakingBalance[user], ratePerSecond);
+        console.log("calc yield for %s", user);
+        console.log("time %s balance %s ratePerSecond %s", time, stakingBalance[user], ratePerSecond);
         uint256 rawYield = (stakingBalance[user] * time * ratePerSecond) / 10**18;
+        console.log('[calculateYieldTotal] RawYield: %s', rawYield);
+
         return rawYield;
     }
 
-    function withdrawYield() public {
+    function withdrawYield(bool compound) public {
         uint256 toTransfer = calculateYieldTotal(msg.sender);
 
+        console.log('[withdrawYield-before] ToTransfer: %s. Rewards: %s. Staked: %s', toTransfer, rewardBalance[msg.sender], stakingBalance[msg.sender]);
         require(
             toTransfer > 0 ||
             rewardBalance[msg.sender] > 0,
@@ -138,8 +141,16 @@ contract FarmXYZBase is Ownable {
         }
 
         startTime[msg.sender] = block.timestamp;
-        // TODO: Test what happens when there aren't enough rewards to transfer to the user
-        rewardToken.safeTransferFrom(address(this), msg.sender, toTransfer);
+
+        if (compound == true) {
+            console.log('[withdrawYield-compound] StakingBalance: %s. To: %s. Amount: %s', stakingBalance[msg.sender], msg.sender, toTransfer);
+            stakingBalance[msg.sender] += toTransfer;
+        } else {
+            console.log('[withdrawYield-transfer] From: %s. To: %s. Amount: %s', address(this), msg.sender, toTransfer);
+            rewardToken.transfer(msg.sender, toTransfer);
+        }
+        console.log('[withdrawYield-after] ToTransfer: %s. Rewards: %s. Staked: %s', toTransfer, rewardBalance[msg.sender], stakingBalance[msg.sender]);
+
         emit YieldWithdraw(msg.sender, toTransfer);
     }
 
