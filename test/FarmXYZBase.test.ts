@@ -33,16 +33,22 @@ describe.only("Farm XYZ", async () => {
   const _apy: number = 10;  // percentage > 0
   const totalRewardPool: BigNumber = ethers.utils.parseEther("1000000");
   const totalStakePool: BigNumber = ethers.utils.parseEther("500000");
+  const totalUserBalance: BigNumber = ethers.utils.parseEther("100000");
 
   let rewardToken: RFarmXToken;
   let stakeToken: TFarmXToken;
   let farmXYZ: FarmXYZBase;
   let owner: SignerWithAddress;
   let john: SignerWithAddress;
+  let alice: SignerWithAddress;
+
+  function calculateRatePerSecond() {
+    return BigNumber.from(_apy).mul(BigNumber.from("10").pow(18)).div(BigNumber.from(100)).div(BigNumber.from(365 * 24 * 3600));
+  }
 
   function calculateCorrectYield(time: number, staked: BigNumber) {
     const stakeTime = BigNumber.from(time);
-    const ratePerSecond = BigNumber.from(_apy).mul(BigNumber.from("10").pow(18)).div(BigNumber.from(100)).div(BigNumber.from(365 * 24 * 3600));
+    const ratePerSecond = calculateRatePerSecond();
 
     return ratePerSecond.mul(staked).mul(stakeTime).div(BigNumber.from("10").pow(18));
   }
@@ -78,11 +84,12 @@ describe.only("Farm XYZ", async () => {
     farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
     await farmXYZ.deployed();
 
-    [owner, john] = await ethers.getSigners();
+    [owner, john, alice] = await ethers.getSigners();
 
     await Promise.all([
       rewardToken.mint(owner.address, totalRewardPool),
-      stakeToken.mint(john.address, totalStakePool),
+      stakeToken.mint(john.address, totalUserBalance),
+      stakeToken.mint(alice.address, totalUserBalance),
     ])
   })
 
@@ -95,8 +102,43 @@ describe.only("Farm XYZ", async () => {
   })
 
   describe('Rewards', async () => {
-    it('should return rewards per day average', function () {
+    it('should calculate total value locked', async () => {
+      const stakeAmount = ethers.utils.parseEther("100");
+      const timeStaked = 24 * 3600;
 
+      expect(await farmXYZ.totalValueLocked()).to.eq(0);
+
+      // a user stake's an amount
+      await rewardToken.transferOwnership(farmXYZ.address);
+      await stakeToken.connect(john).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(john).stake(stakeAmount);
+
+      expect(await farmXYZ.totalValueLocked()).to.eq(stakeAmount);
+
+      // another use stake's an amount
+      await stakeToken.connect(alice).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(alice).stake(stakeAmount);
+
+      expect(await farmXYZ.totalValueLocked()).to.eq(stakeAmount.add(stakeAmount));
+    });
+
+    it('should return total rewards per day', async () => {
+      const ratePerDay = calculateRatePerSecond().mul(24 * 3600);
+      const stakeAmount = ethers.utils.parseEther("100");
+
+      // stake an initial sum
+      await rewardToken.transferOwnership(farmXYZ.address);
+      await stakeToken.connect(john).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(john).stake(stakeAmount);
+      await stakeToken.connect(alice).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(alice).stake(stakeAmount);
+
+      expect(await farmXYZ.rewardsPerDay()).to.eq(stakeAmount.mul(2).mul(ratePerDay));
+
+      // unstake an amount from pool
+      await farmXYZ.connect(john).unstake(stakeAmount);
+
+      expect(await farmXYZ.rewardsPerDay()).to.eq(stakeAmount.mul(ratePerDay));
     });
 
     it('should deposit rewards to reward pool', async () => {
@@ -110,17 +152,22 @@ describe.only("Farm XYZ", async () => {
 
   describe('Stake', async () => {
     it('should approve transfer and stake amount', async () => {
+      let stakeAmount = ethers.utils.parseEther("100");
+
+      expect(await farmXYZ.stakingBalance(john.address))
+          .to.eq(0);
+
       await rewardToken.transferOwnership(farmXYZ.address);
-      await stakeToken.connect(john).approve(farmXYZ.address, totalStakePool);
+      await stakeToken.connect(john).approve(farmXYZ.address, stakeAmount);
 
       expect(await farmXYZ.isStaking(john.address))
           .to.eq(false);
 
-      expect(await farmXYZ.connect(john).stake(totalStakePool))
+      expect(await farmXYZ.connect(john).stake(stakeAmount))
           .to.be.ok;
 
       expect(await farmXYZ.stakingBalance(john.address))
-          .to.eq(totalStakePool);
+          .to.eq(stakeAmount);
 
       expect(await farmXYZ.isStaking(john.address))
           .to.eq(true);
@@ -128,16 +175,20 @@ describe.only("Farm XYZ", async () => {
   })
 
   describe('Unstake', async () => {
+    const stakeAmount = ethers.utils.parseEther("100");
+
     beforeEach(async () => {
-      await stakeToken.connect(john).approve(farmXYZ.address, totalStakePool);
-      await farmXYZ.connect(john).stake(totalStakePool)
+      await stakeToken.connect(john).approve(farmXYZ.address, stakeAmount);
+      await farmXYZ.connect(john).stake(stakeAmount);
     })
 
     it('should unstake balance from user', async () => {
-      await farmXYZ.connect(john).unstake(totalStakePool);
+      expect(await farmXYZ.isStaking(john.address))
+          .to.eq(true);
 
-      const stakingBalance = await farmXYZ.stakingBalance(john.address);
-      expect(Number(stakingBalance))
+      await farmXYZ.connect(john).unstake(stakeAmount);
+
+      expect(await farmXYZ.stakingBalance(john.address))
           .to.eq(0);
 
       expect(await farmXYZ.isStaking(john.address))
@@ -145,26 +196,32 @@ describe.only("Farm XYZ", async () => {
     })
 
     it("should update yield balance when unstaked", async () => {
-      await time.increase(86400)
-      await farmXYZ.connect(john).unstake(ethers.utils.parseEther("5"))
+      const unstakeAmount = ethers.utils.parseEther("5");
+      await time.increase(86400);
+      await farmXYZ.connect(john).unstake(unstakeAmount);
 
-      let res = await farmXYZ.stakingBalance(john.address)
-      expect(Number(ethers.utils.formatEther(res)))
-          .to.be.approximately(95, .001)
+      expect(await farmXYZ.stakingBalance(john.address))
+          .to.be.eq(stakeAmount.sub(unstakeAmount));
     })
   })
 
   describe('Yield', async () => {
     it('should return correct yield time', async () => {
-      let timeStart = await farmXYZ.startTime(john.address)
-      expect(Number(timeStart))
-          .to.be.greaterThanOrEqual(0)
+      // when there is no action made by the user the start time is not set
+      expect((await farmXYZ.startTime(john.address)).toNumber())
+          .to.be.eq(0);
+
+      // when staking start time should be updated
+      await stakeInFarm(john, ethers.utils.parseEther("100"));
+      expect((await farmXYZ.startTime(john.address)).toNumber())
+          .to.be.eq((await time.latest()).toNumber());
 
       // Fast-forward time
-      await time.increase(86400)
+      const timeStaked = 24 * 3600;
+      await time.increase(timeStaked);
 
-      expect(await farmXYZ.calculateYieldTime(john.address))
-          .to.eq((86400))
+      const yieldTime = await farmXYZ.calculateYieldTime(john.address);
+      expect(yieldTime.toNumber()).to.eq(timeStaked)
     })
 
     it('should calculate correct yield', async () => {
@@ -201,24 +258,6 @@ describe.only("Farm XYZ", async () => {
         expect(e.message).to.eq("VM Exception while processing transaction: reverted with reason string 'Nothing to withdraw'");
       }
     })
-
-    it('should not withdraw when there are less rewards available in farm than withdraw yield', async () => {
-      let staked = await farmXYZ.stakingBalance(john.address)
-      let rewards = await farmXYZ.rewardBalance(john.address)
-
-      expect(staked).to.eq(totalStakePool);
-      expect(rewards).to.eq(0);
-
-      const stakeTime = 365 * 24 * 3600;
-      await time.increase(stakeTime);
-
-      try {
-        await farmXYZ.connect(john).withdrawYield(false);
-        fail('Expected error: `Insuficient balance`');
-      } catch (e: any) {
-        expect(e.message).to.eq("VM Exception while processing transaction: reverted with reason string 'Insuficient balance'");
-      }
-    });
   })
 
   describe('Harvest withdrawal', async () => {
@@ -228,7 +267,7 @@ describe.only("Farm XYZ", async () => {
       await farmXYZ.connect(owner).depositToRewardPool(totalRewardPool);
     })
 
-    it('should be able to harvest yield after staking', async () => {
+    it.only('should be able to harvest yield after staking', async () => {
       // stake an amount into the pool
       expect(await farmXYZ.stakingBalance(john.address)).to.eq(0);
       let stakeAmount = ethers.utils.parseEther("100");
@@ -259,8 +298,9 @@ describe.only("Farm XYZ", async () => {
       let currentRewards = await farmXYZ.rewardBalance(john.address);
       let currentBalance = await john.getBalance();
       let currentRewardPool = await farmXYZ.totalRewardPool();
+      const expectedBalance = initialBalance.add(expectedYield);
 
-      console.log('after-withdraw', {currentStaked, currentRewards, currentBalance, currentRewardPool});
+      console.log('after-withdraw', {currentStaked, currentRewards, initialBalance, expectedBalance, currentBalance, currentRewardPool});
 
       expect(currentStaked).to.eq(initialStaked);
       expect(currentRewards).to.eq(0);

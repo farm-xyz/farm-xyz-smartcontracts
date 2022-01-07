@@ -41,14 +41,26 @@ contract FarmXYZBase is Ownable {
         IERC20 _rewardToken,
         uint16 _apy
     ) {
-        require(_apy>0, "Can't have 0 APY pool");
+        require(_apy > 0, "Can't have 0 APY pool");
         stakeToken = _stakeToken;
         rewardToken = _rewardToken;
-        apy = _apy;
-        ratePerSecond = _apy * 10**18 / 100 / (365 days);
+        updateApy(_apy);
     }
 
     // TODO: Add a method to update APY - should also update ratePerSecond
+
+    function calculateRatePerSecond() internal view returns (uint256) {
+        return apy * 10 ** 18 / 100 / (365 days);
+    }
+
+    function updateApy(uint16 _apy) public onlyOwner {
+        apy = _apy;
+        ratePerSecond = calculateRatePerSecond();
+    }
+
+    function rewardsPerDay() public view returns (uint256) {
+        return totalValueLocked * ratePerSecond * 24 * 3600;
+    }
 
     function totalRewardPool() public view returns (uint256) {
         return rewardToken.balanceOf(address(this));
@@ -70,7 +82,7 @@ contract FarmXYZBase is Ownable {
         require(amount > 0, "You cannot stake zero tokens");
         require(stakeToken.balanceOf(msg.sender) >= amount, "You don't own enough tokens");
 
-        if(isStaking[msg.sender] == true) {
+        if (isStaking[msg.sender] == true) {
             console.log("Sender is already staking, calculating current balance and saving state");
             uint256 toTransfer = calculateYieldTotal(msg.sender);
             console.log("Current pending balance", toTransfer);
@@ -108,17 +120,18 @@ contract FarmXYZBase is Ownable {
     /**
      * Returns the number of seconds since the user staked his tokens
      */
-    function calculateYieldTime(address user) public view returns(uint256){
+    function calculateYieldTime(address user) public view returns (uint256){
         uint256 end = block.timestamp;
         uint256 totalTime = end - startTime[user];
+        console.log("[calculateYieldTime] Start: %s. End: %s. Diff: %s", startTime[user], end, totalTime);
         return totalTime;
     }
 
-    function calculateYieldTotal(address user) public view returns(uint256) {
+    function calculateYieldTotal(address user) public view returns (uint256) {
         uint256 time = calculateYieldTime(user);
         console.log("calc yield for %s", user);
         console.log("time %s balance %s ratePerSecond %s", time, stakingBalance[user], ratePerSecond);
-        uint256 rawYield = (stakingBalance[user] * time * ratePerSecond) / 10**18;
+        uint256 rawYield = (stakingBalance[user] * time * ratePerSecond) / 10 ** 18;
         console.log('[calculateYieldTotal] RawYield: %s', rawYield);
 
         return rawYield;
@@ -134,7 +147,7 @@ contract FarmXYZBase is Ownable {
             "Nothing to withdraw"
         );
 
-        if(rewardBalance[msg.sender] != 0) {
+        if (rewardBalance[msg.sender] != 0) {
             uint256 oldBalance = rewardBalance[msg.sender];
             rewardBalance[msg.sender] = 0;
             toTransfer += oldBalance;
