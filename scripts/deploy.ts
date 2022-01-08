@@ -20,19 +20,19 @@ async function main() {
   let rewardToken = await RFarmXToken.deploy();
   let stakeToken = await TFarmXToken.deploy();
   let farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-  console.log("FarmXYZ #1 - small:", farmXYZ, {_apy});
+  console.log("FarmXYZ #1 - small:", farmXYZ.address, {_apy});
 
   _apy = 70;
   rewardToken = await RFarmXToken.deploy();
   stakeToken = await TFarmXToken.deploy();
   farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-  console.log("FarmXYZ #1 - medium:", farmXYZ, {_apy});
+  console.log("FarmXYZ #1 - medium:", farmXYZ.address, {_apy});
 
   _apy = 120;
   rewardToken = await RFarmXToken.deploy();
   stakeToken = await TFarmXToken.deploy();
   farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-  console.log("FarmXYZ #1 - large:", farmXYZ, {_apy});
+  console.log("FarmXYZ #1 - large:", farmXYZ.address, {_apy});
 }
 
 main()
