@@ -14,10 +14,10 @@ async function deployRewardToken() {
   const rewardToken = await RFarmXToken.deploy();
 
   console.log("RewardToken:", rewardToken.address);
-  await hardhatRun("verify:verify", {
-    address: rewardToken.address,
-    constructorArguments: [],
-  });
+  // await hardhatRun("verify:verify", {
+  //   address: rewardToken.address,
+  //   constructorArguments: [],
+  // });
 
   fs.writeFileSync(process.cwd() + '/build/contracts/RFarmXToken.json', JSON.stringify(rewardToken));
 
@@ -29,10 +29,10 @@ async function deployStakeToken() {
   const stakeToken = await TFarmXToken.deploy();
 
   console.log("StakeToken:", stakeToken.address);
-  await hardhatRun("verify:verify", {
-    address: stakeToken.address,
-    constructorArguments: [],
-  });
+  // await hardhatRun("verify:verify", {
+  //   address: stakeToken.address,
+  //   constructorArguments: [],
+  // });
 
   fs.writeFileSync(process.cwd() + '/build/contracts/TFarmXToken.json', JSON.stringify(stakeToken));
 
@@ -43,10 +43,10 @@ async function deployFarm(factory: ContractFactory, stakeTokenAddress: string, r
   const farmXYZ = await factory.deploy(stakeTokenAddress, rewardTokenAddress, _apy);
   console.log("FarmXYZ:", farmXYZ.address, {_apy});
 
-  await hardhatRun("verify:verify", {
-    address: farmXYZ.address,
-    constructorArguments: [stakeTokenAddress, rewardTokenAddress, _apy],
-  });
+  // await hardhatRun("verify:verify", {
+  //   address: farmXYZ.address,
+  //   constructorArguments: [stakeTokenAddress, rewardTokenAddress, _apy],
+  // });
 
   fs.writeFileSync(process.cwd() + `/build/contracts/FarmXYZ_${_apy}.json`, JSON.stringify(farmXYZ));
 
