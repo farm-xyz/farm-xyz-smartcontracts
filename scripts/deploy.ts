@@ -3,28 +3,41 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
+import {ethers} from "hardhat";
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const [deployer] = await ethers.getSigners();
 
-  // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  console.log("Deploying contracts with the account:", deployer.address);
+  console.log("Account balance: ", (await deployer.getBalance()).toString());
+  console.log("ENV", process.env.ROPSTEN_PRIVATE_KEY, process.env.ROPSTEN_ALCHEMY_API_KEY);
 
-  await greeter.deployed();
+  const RFarmXToken = await ethers.getContractFactory("RFarmXToken");
+  const TFarmXToken = await ethers.getContractFactory("TFarmXToken");
+  const FarmXYZBase = await ethers.getContractFactory("FarmXYZBase");
 
-  console.log("Greeter deployed to:", greeter.address);
+  let _apy = 50;
+  let rewardToken = await RFarmXToken.deploy();
+  let stakeToken = await TFarmXToken.deploy();
+  let farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
+  console.log("FarmXYZ #1 - small:", farmXYZ, {_apy});
+
+  _apy = 70;
+  rewardToken = await RFarmXToken.deploy();
+  stakeToken = await TFarmXToken.deploy();
+  farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
+  console.log("FarmXYZ #1 - medium:", farmXYZ, {_apy});
+
+  _apy = 120;
+  rewardToken = await RFarmXToken.deploy();
+  stakeToken = await TFarmXToken.deploy();
+  farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
+  console.log("FarmXYZ #1 - large:", farmXYZ, {_apy});
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });

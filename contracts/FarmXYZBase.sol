@@ -50,7 +50,11 @@ contract FarmXYZBase is Ownable {
     // TODO: Add a method to update APY - should also update ratePerSecond
 
     function calculateRatePerSecond() internal view returns (uint256) {
-        return apy * 10 ** 18 / 100 / (365 days);
+        uint256 rps = 0;
+        unchecked {
+            rps = apy * 10 ** 18 / 100 / (365 days);
+        }
+        return rps;
     }
 
     function updateApy(uint16 _apy) public onlyOwner {
