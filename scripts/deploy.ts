@@ -3,36 +3,53 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import {ethers} from "hardhat";
+import "@nomiclabs/hardhat-etherscan";
+import {ethers, run as hardhatRun} from "hardhat";
 
 async function main() {
   const [deployer] = await ethers.getSigners();
 
   console.log("Deploying contracts with the account:", deployer.address);
-  console.log("Account balance: ", (await deployer.getBalance()).toString());
+  console.log("Account balance:", (await deployer.getBalance()).toString());
   console.log("ENV", process.env.ROPSTEN_PRIVATE_KEY, process.env.ROPSTEN_ALCHEMY_API_KEY);
 
   const RFarmXToken = await ethers.getContractFactory("RFarmXToken");
   const TFarmXToken = await ethers.getContractFactory("TFarmXToken");
   const FarmXYZBase = await ethers.getContractFactory("FarmXYZBase");
 
-  let _apy = 50;
-  let rewardToken = await RFarmXToken.deploy();
-  let stakeToken = await TFarmXToken.deploy();
-  let farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
+  let _apy: number, farmXYZ;
+  const rewardToken = await RFarmXToken.deploy();
+  const stakeToken = await TFarmXToken.deploy();
+
+  console.log("StakeToken:", stakeToken.address);
+  console.log("RewardToken:", rewardToken.address);
+
+  _apy = 50;
+  farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
   console.log("FarmXYZ #1 - small:", farmXYZ.address, {_apy});
 
+  await hardhatRun("verify:verify", {
+    address: farmXYZ.address,
+    constructorArguments: [stakeToken.address, rewardToken.address, _apy],
+  });
+
   _apy = 70;
-  rewardToken = await RFarmXToken.deploy();
-  stakeToken = await TFarmXToken.deploy();
   farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-  console.log("FarmXYZ #1 - medium:", farmXYZ.address, {_apy});
+  console.log("FarmXYZ #2 - medium:", farmXYZ.address, {_apy});
+
+  await hardhatRun("verify:verify", {
+    address: farmXYZ.address,
+    constructorArguments: [stakeToken.address, rewardToken.address, _apy],
+  });
 
   _apy = 120;
-  rewardToken = await RFarmXToken.deploy();
-  stakeToken = await TFarmXToken.deploy();
   farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-  console.log("FarmXYZ #1 - large:", farmXYZ.address, {_apy});
+  console.log("FarmXYZ #3 - large:", farmXYZ.address, {_apy});
+
+  await hardhatRun("verify:verify", {
+    address: farmXYZ.address,
+    constructorArguments: [stakeToken.address, rewardToken.address, _apy],
+  });
 }
 
 main()
