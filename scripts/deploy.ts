@@ -86,10 +86,10 @@ async function main() {
 
   // await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 50);
   // console.log("Account balance:", (await deployer.getBalance()).toString());
-  await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 70);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
-  // await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 120);
+  // await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 70);
   // console.log("Account balance:", (await deployer.getBalance()).toString());
+  await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 120);
+  console.log("Account balance:", (await deployer.getBalance()).toString());
 }
 
 main()
