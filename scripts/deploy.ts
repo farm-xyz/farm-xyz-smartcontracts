@@ -4,7 +4,7 @@
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
 import "@nomiclabs/hardhat-etherscan";
-import {ethers, run as hardhatRun} from "hardhat";
+import {ethers} from "hardhat";
 import {ContractFactory} from "ethers";
 import {TFarmXToken} from "../typechain";
 import * as fs from "fs";
@@ -67,20 +67,29 @@ async function main() {
     rewardToken = JSON.parse(fs.readFileSync(rewardFilePath).toString());
     console.log('CacheRewardToken', rewardToken.address);
   } else {
-    rewardToken = await deployRewardToken();
+    // rewardToken = await deployRewardToken();
   }
+  console.log("Account balance:", (await deployer.getBalance()).toString());
   if (fs.existsSync(stakeFilePath)) {
     stakeToken = JSON.parse(fs.readFileSync(stakeFilePath).toString());
     console.log('CacheStakeToken', stakeToken.address);
   } else {
-    stakeToken = await deployStakeToken();
+    // stakeToken = await deployStakeToken();
+  }
+
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  if (!(stakeToken.address && rewardToken.address)) {
+    throw new Error("Invalid farm tokens!");
   }
 
   const FarmXYZBase = await ethers.getContractFactory("FarmXYZBase");
 
-  await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 50);
+  // await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 50);
+  // console.log("Account balance:", (await deployer.getBalance()).toString());
   await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 70);
-  await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 120);
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  // await deployFarm(FarmXYZBase, stakeToken.address, rewardToken.address, 120);
+  // console.log("Account balance:", (await deployer.getBalance()).toString());
 }
 
 main()
