@@ -42,7 +42,9 @@
     "typescript": "^4.5.4"
   },
   "scripts": {
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "deploy:token": "npx hardhat run --network ropsten scripts/deploy-token.ts",
+    "verify:token": "ts-node scripts/verify-token.ts"
   },
   "author": "",
   "license": "ISC"

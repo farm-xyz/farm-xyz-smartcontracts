@@ -48,8 +48,6 @@ contract FarmXYZBase is Ownable {
         updateApy(_apy);
     }
 
-    // TODO: Add a method to update APY - should also update ratePerSecond
-
     function calculateRatePerSecond() internal view returns (uint256) {
         return uint256(apy) * 10 ** 18 / 100 / (365 days);
     }

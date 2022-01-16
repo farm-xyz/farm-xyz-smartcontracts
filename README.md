@@ -39,6 +39,8 @@ Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_
 
 ```shell
 npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
+
+npx hardhat verify --network ropsten --contract contracts/TFarmXToken.sol:TFarmXToken 0x84D41A8a0087A545455E21beBA2cf71d138793d7
 ```
 
 # Performance optimizations

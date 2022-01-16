@@ -1560,7 +1560,7 @@
     "filters": {},
     "_runningEvents": {},
     "_wrappedEmits": {},
-        "address": "0x699dDa738877180D7aC2eeB80eD03A48b22c4a7C",
+    "address": "0x699dDa738877180D7aC2eeB80eD03A48b22c4a7C",
     "resolvedAddress": {},
     "deployTransaction": {
         "hash": "0x8a2e0c757b0700e46c5fdbf6372dc3bb06760d957189a6a9dcb1494c339758e8",
