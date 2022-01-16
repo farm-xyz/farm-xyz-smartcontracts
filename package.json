@@ -23,6 +23,7 @@
     "@typescript-eslint/parser": "^4.33.0",
     "chai": "^4.3.4",
     "dotenv": "^10.0.0",
+    "enquirer": "^2.3.6",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-config-standard": "^16.0.3",
@@ -44,9 +45,10 @@
   },
   "scripts": {
     "test": "npx hardhat test",
-    "deploy:token": "npx hardhat run --network ropsten scripts/deploy-token.ts",
-    "deploy:farm": "npx hardhat run --network ropsten scripts/deploy-farm.ts",
-    "verify:token": "ts-node scripts/verify-token.ts"
+    "token:deploy": "npx hardhat run --network ropsten scripts/deploy-token.ts",
+    "token:verify": "ts-node scripts/verify-token.ts",
+    "farm:deploy": "npx hardhat run --network ropsten scripts/deploy-farm.ts",
+    "farm:verify": "ts-node scripts/verify-farm.ts"
   },
   "author": "",
   "license": "ISC"
