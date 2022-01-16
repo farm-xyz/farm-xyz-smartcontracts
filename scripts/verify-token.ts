@@ -1,28 +1,50 @@
 import fs from "fs";
 import {execSync} from "child_process";
 
-async function main(name: string | undefined, address: string | undefined) {
-  console.log('Arguments:', name, address);
-  if (typeof name !== 'string') {
+const {Input} = require('enquirer');
+
+function getContractPath(filename: string): string {
+  return process.cwd() + `/build/contracts/${filename}`;
+}
+
+function readContractFile(filename: string): { address: string } {
+  const path = getContractPath(filename);
+  if (!fs.existsSync(path)) {
+    throw new Error(`Expected contract build at path: ${filename}`);
+  }
+
+  return JSON.parse(fs.readFileSync(path).toString())
+}
+
+async function main(filename: string | undefined) {
+  if (!filename) {
+    filename = await (new Input({
+      type: 'input',
+      name: 'filename',
+      message: 'What is deployed contract filename?',
+      skip: false,
+      validate: (value: any) => typeof value === 'string' && fs.existsSync(getContractPath(value))
+    })).run();
+  }
+  if (typeof filename !== 'string') {
     throw new Error('Expected a token name as 1st argument');
   }
-  if (typeof address !== 'string') {
-    throw new Error('Expected a token address as 2nd argument');
+  const contract = readContractFile(filename);
+  const contractName = filename.substring(0, filename.indexOf('.json'));
+  const contractPath = process.cwd() + `/contracts/${contractName}.sol`;
+  if (!fs.existsSync(contractPath)) {
+    throw new Error(`Contract ${contractPath} does not exists in project`);
   }
+  console.log('Arguments:', filename, contractName, contract.address);
 
-  const sourcePath = process.cwd() + `/contracts/${name}.sol`;
-  if (!fs.existsSync(sourcePath)) {
-    throw new Error(`The token is expected to have a contract defined in "/contracts" dir, named ${name}.sol`);
-  }
-
-  const cmd = `npx hardhat verify --network ropsten --contract contracts/${name}.sol:${name} ${address}`;
+  const cmd = `npx hardhat verify --network ropsten --contract contracts/${contractName}.sol:${contractName} ${contract.address}`;
   console.log(`Execute command: ${cmd}`);
 
   const output = execSync(cmd);
   console.log(`output: ${output}`);
 }
 
-main(process.argv[2], process.argv[3])
+main(process.argv[2])
     .then(() => process.exit(0))
     .catch((error) => {
       console.error(error);
