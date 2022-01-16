@@ -7,6 +7,8 @@ import "@nomiclabs/hardhat-etherscan";
 import fs from "fs";
 import {ethers} from "hardhat";
 
+const Confirm = require('prompt-confirm');
+
 async function main(name: string | undefined) {
   console.log('Token name:', name);
   if (typeof name !== 'string') {
@@ -28,6 +30,11 @@ async function main(name: string | undefined) {
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
   console.log("ENV", process.env.ROPSTEN_PRIVATE_KEY, process.env.ROPSTEN_ALCHEMY_API_KEY);
+  const confirmation = new Confirm(`Deploy token ${sourcePath}?`);
+  const response = await confirmation.run();
+  if (response !== true) {
+    throw new Error('Deployment not confirmed!');
+  }
 
   const factory = await ethers.getContractFactory(name);
   const token = await factory.deploy();
