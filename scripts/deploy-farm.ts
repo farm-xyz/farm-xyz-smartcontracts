@@ -90,16 +90,16 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
-  const confirmation = new Confirm(`Deploy farm with arguments: RewardToken: ${rewardToken.address}, StakeToken: ${stakeToken.address}, APY: ${apy}?`);
+  const confirmation = new Confirm(`Deploy farm with arguments: StakeToken: ${stakeToken.address}, RewardToken: ${rewardToken.address}, APY: ${apy}?`);
   const response = await confirmation.run();
   if (response !== true) {
     throw new Error('Deployment not confirmed!');
   }
-  console.log("Deploying farm with arguments", rewardToken.address, stakeToken.address, apy);
+  console.log("Deploying farm with arguments", stakeToken.address, rewardToken.address, apy);
 
   const factory = await ethers.getContractFactory(farmName);
 
-  const farm = await factory.deploy(rewardToken.address, stakeToken.address, apy);
+  const farm = await factory.deploy(stakeToken.address, rewardToken.address, apy);
   console.log("Farm deployed at address:", farm.address);
 
   fs.writeFileSync(farmBuildPath, JSON.stringify(farm));
