@@ -5,7 +5,7 @@
 // Runtime Environment's members available in the global scope.
 import "@nomiclabs/hardhat-etherscan";
 import fs from "fs";
-import {ethers} from "hardhat";
+import {FarmXYZTools} from "./utils/FarmXYZTools";
 
 const Confirm = require('prompt-confirm');
 
@@ -79,33 +79,13 @@ function parseArguments(): { farmName: string, rewardTokenName: string, stakeTok
 }
 
 async function main() {
-  const {farmName, rewardTokenName, stakeTokenName, apy} = parseArguments();
-  console.log('Arguments:', farmName, rewardTokenName, stakeTokenName, apy, `Ropesten: ${process.env.ROPSTEN_PRIVATE_KEY}`, `Alchemy: ${process.env.ROPSTEN_ALCHEMY_API_KEY}`);
+  const farmName = await FarmXYZTools.promptInput('What is the farm contract name?', 'FarmXYZBase.sol');
+  const stakeTokenName = await FarmXYZTools.promptInput('What is the STAKE token contract name?');
+  const rewardTokenName = await FarmXYZTools.promptInput('What is the REWARD token contract name?',);
+  const apy = await FarmXYZTools.promptNumber('What is the farm APY?',);
 
-  const farmBuildPath = getFarmBuildPath(farmName, rewardTokenName, stakeTokenName, apy);
-  const rewardToken = getRewardToken(rewardTokenName);
-  const stakeToken = getStakeToken(stakeTokenName);
-  const [deployer] = await ethers.getSigners();
-
-  console.log("Deploying contracts with the account:", deployer.address);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
-
-  const confirmation = new Confirm(`Deploy farm with arguments: StakeToken: ${stakeToken.address}, RewardToken: ${rewardToken.address}, APY: ${apy}?`);
-  const response = await confirmation.run();
-  if (response !== true) {
-    throw new Error('Deployment not confirmed!');
-  }
-  console.log("Deploying farm with arguments", stakeToken.address, rewardToken.address, apy);
-
-  const factory = await ethers.getContractFactory(farmName);
-
-  const farm = await factory.deploy(stakeToken.address, rewardToken.address, apy);
-  console.log("Farm deployed at address:", farm.address);
-
-  fs.writeFileSync(farmBuildPath, JSON.stringify(farm));
-
-  console.log("Farm data saved at:", farmBuildPath);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
+  const buildPath = await FarmXYZTools.deployFarm(farmName, stakeTokenName, rewardTokenName, apy);
+  console.log(`Deployed at: ${buildPath}`);
 }
 
 main()
