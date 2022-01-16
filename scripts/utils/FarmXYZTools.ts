@@ -7,6 +7,7 @@ const Confirm = require('prompt-confirm');
 export namespace FarmXYZTools {
 
   export type FarmXYZContract = { address: string };
+  export type FarmXYZContractArgs = { farmName: string, farm?: FarmXYZContract, stakeToken: FarmXYZContract, rewardToken: FarmXYZContract, apy: number };
 
   export function readContractBuildFile(filename: string): FarmXYZContract {
     const path = getContractBuildPath(filename);
@@ -31,15 +32,42 @@ export namespace FarmXYZTools {
   }
 
   export function contractDefinitionExists(filename: string): boolean {
+    filename = filename.replace(/.json$/g, '.sol');
+
     return fs.existsSync(getContractDefinitionPath(filename));
+  }
+
+  export function extractFarmArgsFromBuildFilename(filename: string): Required<FarmXYZContractArgs> {
+    const [farmName, stakeTokenName, rewardTokenName, apy] = filename.replace(/.json$/g, '').split('_');
+
+    const farm = readContractBuildFile(filename);
+    const stakeContract = readContractBuildFile(stakeTokenName + "Token.json");
+    const rewardContract = readContractBuildFile(rewardTokenName + "Token.json");
+
+    return {
+      farmName: farmName.indexOf('Base') > 0 ? farmName : (farmName + "Base"),
+      farm: {
+        address: farm.address
+      },
+      stakeToken: {
+        address: stakeContract.address
+      },
+      rewardToken: {
+        address: rewardContract.address
+      },
+      apy: parseInt(apy)
+    };
   }
 
   export async function deployToken(filename: string): Promise<string> {
     if (!contractDefinitionExists(filename)) {
       throw new Error(`Token ${filename} does not exists in "contracts" dir.`);
     }
+    if (contractBuildExists(filename)) {
+      throw new Error(`Token ${filename} is already deployed.`);
+    }
 
-    return await deployContract(filename);
+    return await deployContract(filename.replace(/.sol$/g, ''));
   }
 
   export async function deployFarm(farmName: string, stakeTokenName: string, rewardTokenName: string, apy: number): Promise<string> {
@@ -115,6 +143,9 @@ export namespace FarmXYZTools {
   function getContractBuildPath(filename: string): string {
     if (filename.indexOf('.sol') > 0) {
       filename = filename.substring(0, filename.indexOf('.sol')) + ".json";
+    }
+    if (filename.indexOf('.json') === -1) {
+      filename += ".json";
     }
 
     return process.cwd() + `/build/contracts/${filename}`;

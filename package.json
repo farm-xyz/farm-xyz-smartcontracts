@@ -46,9 +46,10 @@
   "scripts": {
     "test": "npx hardhat test",
     "token:deploy": "npx hardhat run --network ropsten scripts/deploy-token.ts",
-    "token:verify": "ts-node scripts/verify-token.ts",
+    "token:verify": "npx hardhat run scripts/verify-token.ts",
     "farm:deploy": "npx hardhat run --network ropsten scripts/deploy-farm.ts",
-    "farm:verify": "ts-node scripts/verify-farm.ts"
+    "farm:deploy:dry-run": "npx hardhat run scripts/deploy-farm.ts",
+    "farm:verify": "npx hardhat run scripts/verify-farm.ts"
   },
   "author": "",
   "license": "ISC"
