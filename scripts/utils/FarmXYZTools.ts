@@ -92,7 +92,7 @@ export namespace FarmXYZTools {
     const stakeToken = readContractBuildFile(stakeTokenName);
     const rewardToken = readContractBuildFile(rewardTokenName);
 
-    return await deployContract(farmName.replace(/.sol$/g, ''), stakeToken.address, rewardToken.address, apy);
+    return await deployContract(farmBuildFilename.replace(/.sol$/g, ''), stakeToken.address, rewardToken.address, apy);
   }
 
   export async function promptInput(message: string, defaultValue?: string | null, validateFcn?: (value: any) => boolean) {
