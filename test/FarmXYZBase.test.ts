@@ -6,7 +6,7 @@ import {BigNumber} from "ethers";
 import {snapshot, time} from '@openzeppelin/test-helpers';
 import {fail} from "assert";
 
-describe.only("Farm XYZ", async () => {
+describe("Farm XYZ", async () => {
   const _apy: number = 120;  // percentage > 0
   const totalRewardPool: BigNumber = ethers.utils.parseEther("1000000");
   const totalStakePool: BigNumber = ethers.utils.parseEther("500000");
