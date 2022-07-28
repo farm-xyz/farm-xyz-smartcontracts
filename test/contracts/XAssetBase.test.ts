@@ -3,6 +3,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
+import { deployFarmXYZContract, deployXAssetFarmContracts } from "../helpers/helpers";
 
 describe.only("XAssetBase", async () => {
   const _apy: number = 120;  // percentage > 0
@@ -18,30 +19,26 @@ describe.only("XAssetBase", async () => {
   let xAsset: XAssetBase;
 
   let owner: SignerWithAddress;
-  let john: SignerWithAddress;
-  let alice: SignerWithAddress;
+  let user1: SignerWithAddress;
+  let user2: SignerWithAddress;
 
   beforeEach(async () => {
-    const RFarmXToken = await ethers.getContractFactory("RFarmXToken");
-    const TFarmXToken = await ethers.getContractFactory("TFarmXToken");
-    const FarmXYZBase = await ethers.getContractFactory("FarmXYZBase");
+    const farmContracts = await deployFarmXYZContract(_apy);
+    const assetContracts = await deployXAssetFarmContracts(farmContracts.farmXYZ);
 
-    rewardToken = await RFarmXToken.deploy();
-    stakeToken = await TFarmXToken.deploy();
-    await Promise.all([
-      rewardToken.deployed(),
-      stakeToken.deployed(),
-    ]);
+    rewardToken = farmContracts.rewardToken;
+    stakeToken = farmContracts.stakeToken;
+    farmXYZ = farmContracts.farmXYZ;
+    farmXYZBridge = assetContracts.bridge;
+    farmXYZStrategy = assetContracts.strategy;
+    xAsset = assetContracts.asset;
 
-    farmXYZ = await FarmXYZBase.deploy(stakeToken.address, rewardToken.address, _apy);
-    await farmXYZ.deployed();
-
-    [owner, john, alice] = await ethers.getSigners();
+    [owner, user1, user2] = await ethers.getSigners();
 
     await Promise.all([
       rewardToken.mint(owner.address, totalRewardPool),
-      stakeToken.mint(john.address, totalUserBalance),
-      stakeToken.mint(alice.address, totalUserBalance),
+      stakeToken.mint(user1.address, totalUserBalance),
+      stakeToken.mint(user2.address, totalUserBalance),
     ])
   })
 
@@ -50,7 +47,17 @@ describe.only("XAssetBase", async () => {
       expect(rewardToken).to.be.ok;
       expect(stakeToken).to.be.ok;
       expect(farmXYZ).to.be.ok;
+      expect(farmXYZBridge).to.be.ok;
+      expect(farmXYZStrategy).to.be.ok;
+      expect(xAsset).to.be.ok;
     })
-  })
+  });
 
+  describe('Invest', () => {
+    it('should invest', async () => {
+      const amount = ethers.utils.parseEther("10");
+
+      await xAsset.connect(user1).invest(amount, rewardToken.address);
+    });
+  });
 });

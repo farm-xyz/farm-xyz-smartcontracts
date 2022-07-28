@@ -6,7 +6,7 @@ interface IXAsset {
     /**
      * @dev Invest an amount of X-BASE-TOKEN in different assets.
      */
-    function invest(uint256 amount) external;
+    function invest(uint256 amount, address token) external;
 
     /**
      * @dev Withdraws a number of shares from the XASSET
@@ -16,6 +16,6 @@ interface IXAsset {
     /**
      * @dev Returns the total shares price, in X-BASE-TOKEN value
      */
-    function getPrice(uint256 amount) external;
+    function getPrice(uint256 amount) external view returns (uint256);
 
 }

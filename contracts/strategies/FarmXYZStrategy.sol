@@ -20,4 +20,10 @@ contract FarmXYZStrategy is IXStrategy {
         bridge = _bridge;
     }
 
+    function convert(uint256 amount, address token) override public returns (uint256) {
+        console.log('[convert]', amount, token);
+        // TODO: handle conversion between token & assets
+
+        return amount;
+    }
 }
