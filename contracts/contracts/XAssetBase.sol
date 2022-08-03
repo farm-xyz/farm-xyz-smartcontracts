@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
 import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
+import "./XAssetShareToken.sol";
 
 // todo #1: events
 // todo #2: bridge
@@ -25,6 +26,9 @@ contract XAssetBase is IXAsset, Ownable {
 
     IXStrategy private strategy;
 
+    XAssetShareToken private shareToken;
+
+
     mapping(address => mapping(address => uint256)) private _shares;
 
     /**
@@ -40,11 +44,16 @@ contract XAssetBase is IXAsset, Ownable {
     /**
      * @param _strategy - The strategy used to manage actions between investment assets
      */
-    constructor(IXStrategy _strategy) {
+    constructor(IXStrategy _strategy, XAssetShareToken _shareToken) { // todo: move strategy to initialized function, add baseToken
         strategy = _strategy;
+        shareToken = _shareToken;
+        // todo: ?? mint 100 shares to 0x0
 
         totalShares = uint256(0);
     }
+
+    // todo: have a createStrategy function that instantiates the strategy with the right params
+    // todo: onlyOnwer, can only run once
 
     function invest(uint256 amount, address token) override public {
         console.log('invest', amount, token);
@@ -59,6 +68,13 @@ contract XAssetBase is IXAsset, Ownable {
     function withdraw(uint256 amount) override public {
         console.log('withdraw', amount);
     }
+
+    // getSharePrice -> price per 1 share
+    // todo: think of how this works if we have 0 shares invested
+
+    // getTVL -> total Value Locked in baseToken -> returned by the strategy
+
+    // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
 
     function getPrice(uint256 amount) override public view returns (uint256) {
         console.log('getPrice', amount);
