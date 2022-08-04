@@ -54,10 +54,44 @@ describe.only("XAssetBase", async () => {
   });
 
   describe('Invest', () => {
-    it('should invest', async () => {
-      const amount = ethers.utils.parseEther("10");
 
-      await xAsset.connect(user1).invest(amount, rewardToken.address);
-    });
+    it('should allow users to invest a specific token amount', async () => {
+
+    })
+
+    it('should allocate shares for the specific investment', async () => {
+
+    })
+
+    it('should calculate price per share', async () => {
+
+    })
+
+    it('should calculate total value locked', async () => {
+
+    })
+
+    it('should return total number of shares minted', async () => {
+
+    })
+
+    it('should allow users to withdraw a specific amount of shares and receive an amount of tokens', async () => {
+
+    })
+
+    it('should calculate the total value owned by an address', async () => {
+
+    })
+
+    it('should calculate the amount of shares received for a specified token and amount', async () => {
+
+    })
+
+
+    // it('should invest', async () => {
+    //   const amount = ethers.utils.parseEther("10");
+    //
+    //   await xAsset.connect(user1).invest(amount, rewardToken.address);
+    // });
   });
 });

@@ -55,8 +55,8 @@ contract XAssetBase is IXAsset, Ownable {
     // todo: have a createStrategy function that instantiates the strategy with the right params
     // todo: onlyOnwer, can only run once
 
-    function invest(uint256 amount, address token) override public {
-        console.log('invest', amount, token);
+    function invest(address token, uint256 amount) override public {
+        console.log('invest', token, amount);
 
         // TODO: calculate amount of shares for the user
         // TODO: add shares to the total amount
@@ -64,6 +64,8 @@ contract XAssetBase is IXAsset, Ownable {
         _shares[msg.sender][token] = amount;
         totalShares += amount;
     }
+
+    // todo: add estimateSharesForInvestmentAmount(token, amount)
 
     function withdraw(uint256 amount) override public {
         console.log('withdraw', amount);
