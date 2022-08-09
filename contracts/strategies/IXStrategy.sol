@@ -6,6 +6,22 @@ interface IXStrategy {
     /**
      * @dev Convert a token amount to assets
      */
-    function convert(uint256 amount, address token) external returns (uint256);
+    function convert(address token, uint256 amount) external returns (uint256);
+
+    /**
+     * @dev Returns baseToken amount of all assets owned by the XAsset
+     */
+    function getTotalAssetValue() external returns (uint256);
+
+    /**
+     * @dev Invests and returns the amount invested, in baseTokens
+     */
+    function invest(address token, uint256 amount, int slippage) external returns (uint256);
+
+    /**
+     * @dev Calculates the right amount of assets to convert for the amount of baseTokens
+     * Returns the number of baseToken converted so the xAsset should burn the shares
+     */
+    function withdraw(address baseToken, uint256 amount, address toToken, uint256 amount, int slippage) external returns (uint256);
 
 }

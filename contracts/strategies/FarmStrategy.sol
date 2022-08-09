@@ -6,19 +6,36 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
 import "./IXStrategy.sol";
-import "../bridges/IXBridge.sol";
+import "../bridges/IXPlatformBridge.sol";
+import "../contracts/IXAsset.sol";
 
 // todo: we'll have multiple strategy types: LPStrategy, LPFarmStrategy, FarmStrategy, MultifarmStrategy, etc.
-contract FarmXYZStrategy is IXStrategy, Ownable {
+contract FarmStrategy is IXStrategy, Ownable {
 
-    string public name = "FarmXYZStrategy";
-    IXBridge private bridge;
+    string public name = "FarmStrategy";
+
+    IXPlatformBridge private bridge;
+
+    IXAsset private xAsset;
+    IERC20 private farm;
+    address private baseToken;
 
     /**
      * @param _bridge - The strategy used to manage actions between investment assets
+     * @param _xAsset - The parent asset
+     * @param _farm - The farm used for investing
+     * @param _baseToken - The base token used for different conversion
      */
-    constructor(IXBridge _bridge) {// todo: add xAsset, pool param, add baseToken, assets to convert to
+    constructor(IXPlatformBridge _bridge,
+        IXAsset _xAsset,
+        IERC20 _farm,
+        address _baseToken) {
+        // todo: add xAsset, pool param, add baseToken, assets to convert to
+
         bridge = _bridge;
+        xAsset = _xAsset;
+        farm = _farm;
+        baseToken = _baseToken;
     }
 
     // invest(token, amount, slippage) -> returns the amount invested in baseTokens
@@ -26,6 +43,9 @@ contract FarmXYZStrategy is IXStrategy, Ownable {
     //  -> uses DexBridge to convert token amount into target tokens, with the specific slippage
     //  -> stake converted assets to pool
     //  -> returns baseToken amount invested
+    function invest(address token, uint256 amount, int slippage) override external returns (uint256) {
+        return 0;
+    }
 
     // withdraw(baseToken amount, toToken, amount?, slippage?) ->
     //    -> autocompound --- maybe v2
@@ -33,14 +53,19 @@ contract FarmXYZStrategy is IXStrategy, Ownable {
     //    -> withdraw from liquidity pool/farm/etc
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
+    function withdraw(address baseToken, uint256 amount, address toToken, uint256 amount, int slippage) override external returns (uint256) {
+        return 0;
+    }
 
-    // getTotalAssetValue() -> returns baseToken amount of all assets owned by the XAsset
-
-
-    function convert(uint256 amount, address token) override public returns (uint256) {
+    function convert(address token, uint256 amount) override public returns (uint256) {
         console.log('[convert]', amount, token);
         // TODO: handle conversion between token & assets
 
         return amount;
+    }
+
+    // getTotalAssetValue() -> returns baseToken amount of all assets owned by the XAsset
+    function getTotalAssetValue() override public returns (uint256) {
+        return 0;
     }
 }

@@ -9,6 +9,7 @@ describe.only("XAssetBase", async () => {
   const _apy: number = 120;  // percentage > 0
   const totalRewardPool: BigNumber = ethers.utils.parseEther("1000000");
   const totalUserBalance: BigNumber = ethers.utils.parseEther("100000");
+  const BASE_TOKEN = "USDT";
 
   let rewardToken: RFarmXToken;
   let stakeToken: TFarmXToken;
@@ -19,8 +20,8 @@ describe.only("XAssetBase", async () => {
   let xAsset: XAssetBase;
 
   let owner: SignerWithAddress;
-  let user1: SignerWithAddress;
-  let user2: SignerWithAddress;
+  let john: SignerWithAddress;
+  let joe: SignerWithAddress;
 
   beforeEach(async () => {
     const farmContracts = await deployFarmXYZContract(_apy);
@@ -33,12 +34,12 @@ describe.only("XAssetBase", async () => {
     farmXYZStrategy = assetContracts.strategy;
     xAsset = assetContracts.asset;
 
-    [owner, user1, user2] = await ethers.getSigners();
+    [owner, john, joe] = await ethers.getSigners();
 
     await Promise.all([
       rewardToken.mint(owner.address, totalRewardPool),
-      stakeToken.mint(user1.address, totalUserBalance),
-      stakeToken.mint(user2.address, totalUserBalance),
+      stakeToken.mint(john.address, totalUserBalance),
+      stakeToken.mint(joe.address, totalUserBalance),
     ])
   })
 
@@ -55,43 +56,78 @@ describe.only("XAssetBase", async () => {
 
   describe('Invest', () => {
 
-    it('should allow users to invest a specific token amount', async () => {
+    it.only('should allow users to invest a specific token amount', async () => {
+      const amount = ethers.utils.parseEther("10");
 
+      const sharesBefore = await xAsset.totalShares();
+      await xAsset.connect(john).invest(BASE_TOKEN, amount);
+      const sharesAfter = await xAsset.totalShares();
+
+      expect(sharesAfter).to.greaterThan(sharesBefore);
     })
 
     it('should allocate shares for the specific investment', async () => {
+      const amount = ethers.utils.parseEther("10");
 
+      const sharesBefore = await xAsset.getTotalValueOwnedBy(john.address);
+      await xAsset.connect(john).invest(BASE_TOKEN, amount);
+      const sharesAfter = await xAsset.getTotalValueOwnedBy(john.address);
+
+      expect(sharesAfter).to.greaterThan(sharesBefore);
     })
 
     it('should calculate price per share', async () => {
+      const amount = ethers.utils.parseEther("10");
+      const pricePerShareBefore = await xAsset.getSharePrice();
 
+      await xAsset.connect(john).invest(BASE_TOKEN, amount);
+      const pricePerShareAfter = await xAsset.getSharePrice();
+
+      expect(pricePerShareAfter).to.eq(pricePerShareBefore);
     })
 
     it('should calculate total value locked', async () => {
+      const tvl = await xAsset.getTVL();
 
+      expect(getTVL).to.greaterThan(ethers.utils.parseEther("0"));
     })
 
     it('should return total number of shares minted', async () => {
+      const totalShares = await xAsset.totalShares();
 
+      expect(totalShares).to.greaterThan(ethers.utils.parseEther("0"));
     })
 
     it('should allow users to withdraw a specific amount of shares and receive an amount of tokens', async () => {
+      // invest 100 tokens
+      await xAsset.connect(john).invest(BASE_TOKEN, ethers.utils.parseEther("100"));
 
+      let ownedShares = await xAsset.getTotalValueOwnedBy(john.address);
+      const halfOwnedShares = ownedShares.div(BigNumber.from(2));
+
+      // withdraw half of the shares
+      await xAsset.connect(john).withdraw(BASE_TOKEN, halfOwnedShares);
+
+      ownedShares = await xAsset.getTotalValueOwnedBy(john.address);
+
+      expect(halfOwnedShares).to.eq(ownedShares);
     })
 
     it('should calculate the total value owned by an address', async () => {
+      // calculate how many shares the user has initially
+      const valueOwnedBefore = await xAsset.getTotalValueOwnedBy(john.address);
 
+      // invest some tokens
+      await xAsset.connect(john.address).invest(ethers.utils.parseEther("10"));
+
+      // calculate how many shares the user has after investing
+      const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(john.address);
+
+      expect(valueOwnedAfter).to.greaterThan(valueOwnedBefore);
     })
 
     it('should calculate the amount of shares received for a specified token and amount', async () => {
-
+      const valueOwnedBefore = await xAsset.getPrice();
     })
-
-
-    // it('should invest', async () => {
-    //   const amount = ethers.utils.parseEther("10");
-    //
-    //   await xAsset.connect(user1).invest(amount, rewardToken.address);
-    // });
   });
 });

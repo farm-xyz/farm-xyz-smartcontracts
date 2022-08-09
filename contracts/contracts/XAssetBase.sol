@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
 import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
 import "./XAssetShareToken.sol";
+import "../strategies/FarmStrategy.sol";
 
 // todo #1: events
 // todo #2: bridge
@@ -18,8 +17,6 @@ import "./XAssetShareToken.sol";
 // zapper - conversie automata
 
 contract XAssetBase is IXAsset, Ownable {
-    using SafeERC20 for IERC20;
-
     string public name = "XAssetBase";
 
     uint256 public totalShares;
@@ -28,8 +25,7 @@ contract XAssetBase is IXAsset, Ownable {
 
     XAssetShareToken private shareToken;
 
-
-    mapping(address => mapping(address => uint256)) private _shares;
+    byte private _strategyIsInitialized = 0;
 
     /**
      * @dev Emitted when `value` tokens are invested into an XAsset
@@ -54,6 +50,13 @@ contract XAssetBase is IXAsset, Ownable {
 
     // todo: have a createStrategy function that instantiates the strategy with the right params
     // todo: onlyOnwer, can only run once
+    function createStrategy() public onlyOwner {
+        if (_strategyInitialized == 0) {
+            _strategy = new FarmStrategy();
+
+            _strategyIsInitialized = 1;
+        }
+    }
 
     function invest(address token, uint256 amount) override public {
         console.log('invest', token, amount);
@@ -61,7 +64,6 @@ contract XAssetBase is IXAsset, Ownable {
         // TODO: calculate amount of shares for the user
         // TODO: add shares to the total amount
 
-        _shares[msg.sender][token] = amount;
         totalShares += amount;
     }
 
@@ -71,12 +73,7 @@ contract XAssetBase is IXAsset, Ownable {
         console.log('withdraw', amount);
     }
 
-    // getSharePrice -> price per 1 share
     // todo: think of how this works if we have 0 shares invested
-
-    // getTVL -> total Value Locked in baseToken -> returned by the strategy
-
-    // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
 
     function getPrice(uint256 amount) override public view returns (uint256) {
         console.log('getPrice', amount);
@@ -84,4 +81,22 @@ contract XAssetBase is IXAsset, Ownable {
         return amount;
     }
 
+    // getSharePrice -> price per 1 share
+    function getSharePrice() public view returns (uint256) {
+        // todo: calculate price per 1 share only, in the base token
+
+        return 0;
+    }
+
+    // getTVL -> total Value Locked in baseToken -> returned by the strategy
+    function getTVL() public view returns (uint256) {
+        // todo: convert shares in base token
+
+        return 0;
+    }
+
+    // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
+    function getTotalValueOwnedBy(address account) public view returns (uint256) {
+        return shareToken.balanceOf(account);
+    }
 }
