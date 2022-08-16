@@ -22,6 +22,6 @@ interface IXStrategy {
      * @dev Calculates the right amount of assets to convert for the amount of baseTokens
      * Returns the number of baseToken converted so the xAsset should burn the shares
      */
-    function withdraw(address baseToken, uint256 amount, address toToken, uint256 amount, int slippage) external returns (uint256);
+    function withdraw(address baseToken, uint256 amount, address toToken, int slippage) external returns (uint256);
 
 }

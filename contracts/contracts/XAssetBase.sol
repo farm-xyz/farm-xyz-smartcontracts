@@ -21,11 +21,13 @@ contract XAssetBase is IXAsset, Ownable {
 
     uint256 public totalShares;
 
+    address private baseToken;
+
     IXStrategy private strategy;
 
     XAssetShareToken private shareToken;
 
-    byte private _strategyIsInitialized = 0;
+    bool private _strategyIsInitialized = false;
 
     /**
      * @dev Emitted when `value` tokens are invested into an XAsset
@@ -38,10 +40,11 @@ contract XAssetBase is IXAsset, Ownable {
     event Withdraw(address indexed to, uint256 amount);
 
     /**
-     * @param _strategy - The strategy used to manage actions between investment assets
+     * @param _baseToken - The token in which conversions are made by default
+     * @param _shareToken - The contract which holds the shares
      */
-    constructor(IXStrategy _strategy, XAssetShareToken _shareToken) { // todo: move strategy to initialized function, add baseToken
-        strategy = _strategy;
+    constructor(address _baseToken, XAssetShareToken _shareToken) {// todo: move strategy to initialized function, add baseToken
+        baseToken = _baseToken;
         shareToken = _shareToken;
         // todo: ?? mint 100 shares to 0x0
 
@@ -50,11 +53,10 @@ contract XAssetBase is IXAsset, Ownable {
 
     // todo: have a createStrategy function that instantiates the strategy with the right params
     // todo: onlyOnwer, can only run once
-    function createStrategy() public onlyOwner {
-        if (_strategyInitialized == 0) {
-            _strategy = new FarmStrategy();
-
-            _strategyIsInitialized = 1;
+    function createStrategy(IXStrategy _strategy) public onlyOwner {
+        if (_strategyIsInitialized == false) {
+            strategy = _strategy;
+            _strategyIsInitialized = true;
         }
     }
 

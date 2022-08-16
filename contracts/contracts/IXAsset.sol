@@ -6,7 +6,7 @@ interface IXAsset {
     /**
      * @dev Invest an amount of X-BASE-TOKEN in different assets.
      */
-    function invest(uint256 amount, address token) external;
+    function invest(address token, uint256 amount) external;
 
     /**
      * @dev Withdraws a number of shares from the XASSET

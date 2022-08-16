@@ -53,7 +53,7 @@ contract FarmStrategy is IXStrategy, Ownable {
     //    -> withdraw from liquidity pool/farm/etc
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
-    function withdraw(address baseToken, uint256 amount, address toToken, uint256 amount, int slippage) override external returns (uint256) {
+    function withdraw(address _baseToken, uint256 amount, address toToken, int slippage) override external returns (uint256) {
         return 0;
     }
 
