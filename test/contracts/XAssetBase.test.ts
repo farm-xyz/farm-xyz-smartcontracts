@@ -76,6 +76,10 @@ describe.only("XAssetBase", async () => {
       expect(sharesAfter).to.greaterThan(sharesBefore);
     })
 
+    it('should calculate price per share with no investments in the XASSET', async () => {
+      // todo: test with no investments
+    })
+
     it('should calculate price per share', async () => {
       const amount = ethers.utils.parseEther("10");
       const pricePerShareBefore = await xAsset.getSharePrice();
@@ -89,7 +93,7 @@ describe.only("XAssetBase", async () => {
     it('should calculate total value locked', async () => {
       const tvl = await xAsset.getTVL();
 
-      expect(getTVL).to.greaterThan(ethers.utils.parseEther("0"));
+      expect(tvl).to.greaterThan(ethers.utils.parseEther("0"));
     })
 
     it('should return total number of shares minted', async () => {

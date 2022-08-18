@@ -58,17 +58,21 @@ contract XAssetBase is IXAsset, Ownable {
 
     // todo: have a createStrategy function that instantiates the strategy with the right params
     // todo: onlyOnwer, can only run once
-    function createStrategy(IXStrategy _strategy) public onlyOwner {
-        if (_strategyIsInitialized == false) {
-            strategy = _strategy;
-            _strategyIsInitialized = true;
-        }
+    function setStrategy(IXStrategy _strategy) public onlyOwner {
+        require(!_strategyIsInitialized, "Strategy is already initialized");
+        strategy = _strategy;
+        _strategyIsInitialized = true;
     }
 
     function invest(address token, uint256 amount) override public {
         console.log('invest', token, amount);
 
-        // TODO: calculate amount of shares for the user
+        // TODO: calculate amount of shares for the user:
+        // 1. getTotalAssetValue from strategy
+        // 2. invest new amount using strategy
+        // 3. getTotalAssetValue from strategy again
+        // 4. calculate difference in value of the new investment
+        // 5. emit shares for that difference in value
         // TODO: add shares to the total amount
 
         totalShares += amount;
@@ -79,9 +83,17 @@ contract XAssetBase is IXAsset, Ownable {
         return 0;
     }
 
-    function withdraw(uint256 amount) override public {
-        console.log('withdraw', amount);
+    function withdraw(uint256 shares) override public {
+        console.log('withdraw', shares);
+        // 1. Validate user has enough shares
+        // 2. getTotalAssetValue from strategy
+        // 3. calculate price per share
+        // 4. withdraw amount using strategy
+        // 5. getTotalAssetValue from strategy again
+        // 6. validate difference in value of the new withdrawal
+        // 7. burn shares for that difference in value
     }
+
 
     // todo: think of how this works if we have 0 shares invested
     function getPrice(uint256 amount) override public view returns (uint256) {
@@ -101,6 +113,8 @@ contract XAssetBase is IXAsset, Ownable {
     // getTVL -> total Value Locked in baseToken -> returned by the strategy
     function getTVL() public view returns (uint256) {
         // notes @Florin: how to calculate TVL for shares? Implemented similarly as for FarmXYZBase
+        // notes @Alex: XAsset asks the strategy the total value of all assets owned - then calculates price per share,
+        //              value of user's shares, etc
 
         return strategy.convert(baseToken, shareToken.totalValueLocked());
     }
