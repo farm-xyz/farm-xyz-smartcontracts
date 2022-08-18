@@ -4,6 +4,7 @@
   "description": "Farm XYZ smart contract modules",
   "main": "index.js",
   "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^4.7.3",
     "hardhat": "^2.8.0"
   },
   "devDependencies": {
