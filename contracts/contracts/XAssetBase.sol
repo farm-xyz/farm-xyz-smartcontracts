@@ -7,6 +7,7 @@ import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
 import "./XAssetShareToken.sol";
 import "../strategies/FarmStrategy.sol";
+import "..\FarmXYZBase.sol";
 
 // todo #1: events
 // todo #2: bridge
@@ -46,7 +47,11 @@ contract XAssetBase is IXAsset, Ownable {
     constructor(address _baseToken, XAssetShareToken _shareToken) {// todo: move strategy to initialized function, add baseToken
         baseToken = _baseToken;
         shareToken = _shareToken;
+
         // todo: ?? mint 100 shares to 0x0
+        // notes @Florin: --> "ERC20: mint to the zero address" : can't mint to 0x0 due to ERC20 condition in _mint(...)
+        // notes @Florin: in this case the `msg.sender` should be the owner, right?
+        _shareToken.mint(msg.sender, 100);
 
         totalShares = uint256(0);
     }
@@ -69,32 +74,35 @@ contract XAssetBase is IXAsset, Ownable {
         totalShares += amount;
     }
 
-    // todo: add estimateSharesForInvestmentAmount(token, amount)
+    function estimateSharesForInvestmentAmount(address token, uint256 amount) public view returns (uint256) {
+        // todo: add estimateSharesForInvestmentAmount(token, amount)
+        return 0;
+    }
 
     function withdraw(uint256 amount) override public {
         console.log('withdraw', amount);
     }
 
     // todo: think of how this works if we have 0 shares invested
-
     function getPrice(uint256 amount) override public view returns (uint256) {
         console.log('getPrice', amount);
 
-        return amount;
+        return strategy.convert(baseToken, amount);
     }
 
     // getSharePrice -> price per 1 share
     function getSharePrice() public view returns (uint256) {
         // todo: calculate price per 1 share only, in the base token
+        // notes @Florin: how and where do we calculate the price for one share? Here or in the strategy?
 
-        return 0;
+        return strategy.convert(baseToken, 1);
     }
 
     // getTVL -> total Value Locked in baseToken -> returned by the strategy
     function getTVL() public view returns (uint256) {
-        // todo: convert shares in base token
+        // notes @Florin: how to calculate TVL for shares? Implemented similarly as for FarmXYZBase
 
-        return 0;
+        return strategy.convert(baseToken, shareToken.totalValueLocked());
     }
 
     // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
