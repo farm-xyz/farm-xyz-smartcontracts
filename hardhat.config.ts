@@ -2,7 +2,8 @@ import * as dotenv from "dotenv";
 
 import {HardhatUserConfig, task} from "hardhat/config";
 import "@nomiclabs/hardhat-etherscan";
-import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-web3";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
@@ -23,29 +24,50 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
-const ROPSTEN_ALCHEMY_API_KEY = process.env.ROPSTEN_ALCHEMY_API_KEY;
-const ROPSTEN_PRIVATE_KEY = process.env.ROPSTEN_PRIVATE_KEY;
+
+const { ETH_MAINNET_RPC_PROVIDER,
+        ETH_ROPSTEN_ETHERSCAN_API_KEY,
+        ETH_ROPSTEN_RPC_PROVIDER,
+        ETH_ROPSTEN_PRIVATE_KEY,
+        POLYGON_MUMBAI_RPC_PROVIDER,
+        POLYGON_RPC_PROVIDER,
+        POLYGON_PRIVATE_KEY,
+        POLYGONSCAN_API_KEY } = process.env;
+
 
 const config: HardhatUserConfig = {
   solidity: "0.8.4",
   networks: {
     hardhat: {
       forking: {
-        url: 'https://eth-mainnet.alchemyapi.io/v2/pKU8oE0eTy2aXAjym4cGUfRtURZN_-N3',
+        url: ETH_MAINNET_RPC_PROVIDER as string,
         blockNumber: 13889838
       }
     },
     ropsten: {
-      url: `https://eth-ropsten.alchemyapi.io/v2/${ROPSTEN_ALCHEMY_API_KEY}`,
-      accounts: [`${ROPSTEN_PRIVATE_KEY}`],
+      url: ETH_ROPSTEN_RPC_PROVIDER,
+      accounts: [`0x${ETH_ROPSTEN_PRIVATE_KEY}`],
     },
+    polygon: {
+      url: POLYGON_RPC_PROVIDER,
+      accounts: [ `0x${POLYGON_PRIVATE_KEY}` ]
+    },
+    mumbai: {
+      url: POLYGON_MUMBAI_RPC_PROVIDER,
+      accounts: [ `0x${POLYGON_PRIVATE_KEY}` ]
+    }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      ropsten: ETH_ROPSTEN_ETHERSCAN_API_KEY as string,
+      polygon: POLYGONSCAN_API_KEY as string,
+      polygonMumbai: POLYGONSCAN_API_KEY as string
+    },
+
   },
 };
 

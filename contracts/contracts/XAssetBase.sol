@@ -7,7 +7,7 @@ import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
 import "./XAssetShareToken.sol";
 import "../strategies/FarmStrategy.sol";
-import "..\FarmXYZBase.sol";
+import "../FarmXYZBase.sol";
 
 // todo #1: events
 // todo #2: bridge
@@ -116,7 +116,8 @@ contract XAssetBase is IXAsset, Ownable {
         // notes @Alex: XAsset asks the strategy the total value of all assets owned - then calculates price per share,
         //              value of user's shares, etc
 
-        return strategy.convert(baseToken, shareToken.totalValueLocked());
+//        return strategy.convert(baseToken, shareToken.totalValueLocked());
+        return strategy.convert(baseToken, 0);
     }
 
     // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
