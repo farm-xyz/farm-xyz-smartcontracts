@@ -6,7 +6,7 @@ interface IXStrategy {
     /**
      * @dev Convert a token amount to assets
      */
-    function convert(address token, uint256 amount) external returns (uint256);
+    function convert(address token, uint256 amount) view external returns (uint256);
 
     /**
      * @dev Returns baseToken amount of all assets owned by the XAsset

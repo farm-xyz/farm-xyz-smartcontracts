@@ -57,7 +57,7 @@ contract FarmStrategy is IXStrategy, Ownable {
         return 0;
     }
 
-    function convert(address token, uint256 amount) override public returns (uint256) {
+    function convert(address token, uint256 amount) view override public returns (uint256) {
         console.log('[convert]', amount, token);
         // TODO: handle conversion between token & assets
 
