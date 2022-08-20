@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "hardhat/console.sol";
 import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
@@ -17,18 +19,34 @@ import "../FarmXYZBase.sol";
 // todo #6: share value conversion in x-base-token
 // zapper - conversie automata
 
-contract XAssetBase is IXAsset, Ownable {
-    string public name = "XAssetBase";
+contract XAssetBase is IXAsset, OwnableUpgradeable {
 
-    uint256 public totalShares;
+    /**
+     * The name of this XASSET
+     */
+    string private _name;
 
-    address private baseToken;
+    /**
+     * The base token that all investments are denominated in.
+     */
+    IERC20Metadata private _baseToken;
 
-    IXStrategy private strategy;
-
-    XAssetShareToken private shareToken;
+    /**
+     * The share token emitted by the XASSET
+     */
+    XAssetShareToken private _shareToken;
 
     bool private _strategyIsInitialized = false;
+
+    /**
+     * The strategy used to manage actions between investment assets.
+     */
+    IXStrategy private _strategy;
+
+    /**
+     * The total no of virtualShares invested in virtual assets using the strategy.
+     */
+    uint256 private _totalVirtualShares = 0;
 
     /**
      * @dev Emitted when `value` tokens are invested into an XAsset
@@ -41,87 +59,100 @@ contract XAssetBase is IXAsset, Ownable {
     event Withdraw(address indexed to, uint256 amount);
 
     /**
-     * @param _baseToken - The token in which conversions are made by default
-     * @param _shareToken - The contract which holds the shares
+     * @param name_ The name of this XASSET
+     * @param baseToken_ The token in which conversions are made by default
+     * @param shareToken_ The contract which holds the shares
      */
-    constructor(address _baseToken, XAssetShareToken _shareToken) {// todo: move strategy to initialized function, add baseToken
-        baseToken = _baseToken;
-        shareToken = _shareToken;
+    function initialize(string calldata name_, IERC20Metadata baseToken_, XAssetShareToken shareToken_) initializer external {
+        __Ownable_init();
 
-        // todo: ?? mint 100 shares to 0x0
-        // notes @Florin: --> "ERC20: mint to the zero address" : can't mint to 0x0 due to ERC20 condition in _mint(...)
-        // notes @Florin: in this case the `msg.sender` should be the owner, right?
-        _shareToken.mint(msg.sender, 100);
-
-        totalShares = uint256(0);
+        _name = name_;
+        _baseToken = baseToken_;
+        _shareToken = shareToken_;
     }
 
-    // todo: have a createStrategy function that instantiates the strategy with the right params
-    // todo: onlyOnwer, can only run once
-    function setStrategy(IXStrategy _strategy) public onlyOwner {
+    /**
+     * @return The name of the XASSET
+     */
+    function name() public view virtual returns (string memory) {
+        return _name;
+    }
+
+    function setStrategy(IXStrategy strategy_) public onlyOwner {
         require(!_strategyIsInitialized, "Strategy is already initialized");
-        strategy = _strategy;
         _strategyIsInitialized = true;
+        _strategy = strategy_;
+
+        // Once we have a strategy let's invest some virtual assets so we can calculate share values
+        // We start with a share value of $10, and 100 shares
+        _strategy.virtualInvest( 1000 * (10**_baseToken.decimals() ));
+        _totalVirtualShares = 100;
     }
 
-    function invest(address token, uint256 amount) override public {
-        console.log('invest', token, amount);
+    function invest(IERC20Metadata token, uint256 amount) override external {
+        console.log('invest', address(token), amount);
 
-        // TODO: calculate amount of shares for the user:
-        // 1. getTotalAssetValue from strategy
-        // 2. invest new amount using strategy
-        // 3. getTotalAssetValue from strategy again
-        // 4. calculate difference in value of the new investment
-        // 5. emit shares for that difference in value
-        // TODO: add shares to the total amount
-
-        totalShares += amount;
+        uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
+        uint256 pricePerShareBeforeInvest = totalAssetValueBeforeInvest/ _shareToken.totalSupply();
+        _strategy.invest(token, amount, 50);
+        uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
+        uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
+        uint256 newSharesToMint = totalAssetValueInvested/pricePerShareBeforeInvest;
+        _shareToken.mint(msg.sender, newSharesToMint);
+        uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
+        require(pricePerShareAfterInvest == pricePerShareBeforeInvest, "Price per share changed");
     }
 
-    function estimateSharesForInvestmentAmount(address token, uint256 amount) public view returns (uint256) {
-        // todo: add estimateSharesForInvestmentAmount(token, amount)
-        return 0;
+    function estimateSharesForInvestmentAmount(IERC20Metadata token, uint256 amount) external view returns (uint256) {
+        uint256 totalAssetValue = _strategy.getTotalAssetValue();
+        uint256 pricePerShare = totalAssetValue/ _shareToken.totalSupply();
+        uint256 baseTokenAmount = _strategy.convert(token, amount);
+        uint256 shares = baseTokenAmount/pricePerShare;
+        return shares;
     }
 
-    function withdraw(uint256 shares) override public {
+    function withdraw(uint256 shares) override external {
         console.log('withdraw', shares);
-        // 1. Validate user has enough shares
-        // 2. getTotalAssetValue from strategy
-        // 3. calculate price per share
-        // 4. withdraw amount using strategy
-        // 5. getTotalAssetValue from strategy again
-        // 6. validate difference in value of the new withdrawal
-        // 7. burn shares for that difference in value
+        require(_shareToken.balanceOf(msg.sender) >= shares, "Not enough shares");
+        uint256 totalAssetValueBeforeWithdraw = _strategy.getTotalAssetValue();
+        uint256 pricePerShareBeforeWithdraw = totalAssetValueBeforeWithdraw / _shareToken.totalSupply();
+        _strategy.withdraw(pricePerShareBeforeWithdraw * shares, _baseToken, 50);
+        _shareToken.burn(msg.sender, shares);
+        uint256 totalAssetValueAfterWithdraw = _strategy.getTotalAssetValue();
+        uint256 pricePerShareAfterWithdraw = totalAssetValueAfterWithdraw / _shareToken.totalSupply();
+        require(pricePerShareAfterWithdraw == pricePerShareBeforeWithdraw, "Price per share changed");
     }
 
 
-    // todo: think of how this works if we have 0 shares invested
-    function getPrice(uint256 amount) override public view returns (uint256) {
-        console.log('getPrice', amount);
-
-        return strategy.convert(baseToken, amount);
+    /**
+     * @param amount - The amount of shares to calculate the value of
+     * @return The value of amount shares in baseToken
+     */
+    function getValueForShares(uint256 amount) override external view returns (uint256) {
+        return this.getSharePrice() * amount;
     }
 
-    // getSharePrice -> price per 1 share
-    function getSharePrice() public view returns (uint256) {
-        // todo: calculate price per 1 share only, in the base token
-        // notes @Florin: how and where do we calculate the price for one share? Here or in the strategy?
-
-        return strategy.convert(baseToken, 1);
+    /**
+     * @return The price per one share of the XASSET
+     */
+    function getSharePrice() override external view returns (uint256) {
+        uint256 totalVirtualAssetsValue = _strategy.getTotalVirtualAssetValue();
+        uint256 sharePrice = totalVirtualAssetsValue / _totalVirtualShares;
+        console.log('getSharePrice', sharePrice);
+        return sharePrice;
     }
 
-    // getTVL -> total Value Locked in baseToken -> returned by the strategy
-    function getTVL() public view returns (uint256) {
-        // notes @Florin: how to calculate TVL for shares? Implemented similarly as for FarmXYZBase
-        // notes @Alex: XAsset asks the strategy the total value of all assets owned - then calculates price per share,
-        //              value of user's shares, etc
-
-//        return strategy.convert(baseToken, shareToken.totalValueLocked());
-        return strategy.convert(baseToken, 0);
+    /**
+     * @return Returns the total amount of baseTokens that are invested in this XASSET
+     */
+    function getTVL() override external view returns (uint256) {
+        return _strategy.getTotalAssetValue();
     }
 
-    // getTotalValueOwnedBy(address): total value invested by address in this xAsset, in baseToken
-    function getTotalValueOwnedBy(address account) public view returns (uint256) {
-        return shareToken.balanceOf(account);
+    /**
+     * @return Total value invested by address in this xAsset, in baseToken
+     */
+    function getTotalValueOwnedBy(address account) override external view returns (uint256) {
+        return _shareToken.balanceOf(account) * this.getSharePrice();
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
@@ -18,7 +19,9 @@ contract FarmStrategy is IXStrategy, Ownable {
 
     IXAsset private xAsset;
     IERC20 private farm;
-    address private baseToken;
+    IERC20Metadata private baseToken;
+
+    mapping(address => uint256) private totalVirtualAssets;
 
     /**
      * @param _bridge - The strategy used to manage actions between investment assets
@@ -29,7 +32,7 @@ contract FarmStrategy is IXStrategy, Ownable {
     constructor(IXPlatformBridge _bridge,
         IXAsset _xAsset,
         IERC20 _farm,
-        address _baseToken) {
+        IERC20Metadata _baseToken) {
         // todo: add xAsset, pool param, add baseToken, assets to convert to
 
         bridge = _bridge;
@@ -43,29 +46,43 @@ contract FarmStrategy is IXStrategy, Ownable {
     //  -> uses DexBridge to convert token amount into target tokens, with the specific slippage
     //  -> stake converted assets to pool
     //  -> returns baseToken amount invested
-    function invest(address token, uint256 amount, int slippage) override external returns (uint256) {
+    function invest(IERC20Metadata token, uint256 amount, int slippage) override external returns (uint256) {
         return 0;
     }
 
-    // withdraw(baseToken amount, toToken, amount?, slippage?) ->
+    // withdraw(amount, toToken, amount?, slippage?) ->
     //    -> autocompound --- maybe v2
     //    -> calculates the right amount of assets to convert for the amount of baseTokens
     //    -> withdraw from liquidity pool/farm/etc
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
-    function withdraw(address _baseToken, uint256 amount, address toToken, int slippage) override external returns (uint256) {
+    function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
         return 0;
     }
 
-    function convert(address token, uint256 amount) view override public returns (uint256) {
-        console.log('[convert]', amount, token);
+    function convert(IERC20Metadata token, uint256 amount) view override public returns (uint256) {
+        console.log('[convert]', amount, address(token));
         // TODO: handle conversion between token & assets
 
         return amount;
     }
 
     // getTotalAssetValue() -> returns baseToken amount of all assets owned by the XAsset
-    function getTotalAssetValue() override public returns (uint256) {
+    function getTotalAssetValue() override view external returns (uint256) {
         return 0;
+    }
+
+    /**
+     * @return The total value of the virtually invested assets
+     */
+    function getTotalVirtualAssetValue() override view external returns (uint256) {
+        return 1000;
+    }
+
+    /**
+     * @dev Virtually invest some tokens in the pool/farm, returns the total amount of baseTokens "invested"
+     */
+    function virtualInvest(uint256 amount) override view external returns (uint256) {
+        return 1000;
     }
 }
