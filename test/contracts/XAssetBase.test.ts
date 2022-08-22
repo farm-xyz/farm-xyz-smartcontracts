@@ -1,22 +1,32 @@
-import { FarmXYZBase, FarmXYZBridge, FarmXYZStrategy, RFarmXToken, TFarmXToken, XAssetBase } from "../../typechain";
+import {
+  FarmXYZBase,
+  FarmXYZPlatformBridge,
+  FarmStrategy,
+  RFarmXToken,
+  TFarmXToken,
+  XAssetBase,
+  TestToken,
+  ERC20
+} from "../../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import { deployFarmXYZContract, deployXAssetFarmContracts } from "../helpers/helpers";
+import { deployFarmXYZTestContracts, deployXAssetFarmContracts } from "../helpers/helpers";
 
 describe.only("XAssetBase", async () => {
   const _apy: number = 120;  // percentage > 0
   const totalRewardPool: BigNumber = ethers.utils.parseEther("1000000");
   const totalUserBalance: BigNumber = ethers.utils.parseEther("100000");
-  const BASE_TOKEN = "USDT";
 
   let rewardToken: RFarmXToken;
   let stakeToken: TFarmXToken;
-  let farmXYZ: FarmXYZBase;
+  let farmXYZFarm: FarmXYZBase;
+  let usdToken: ERC20;
+  let shareToken: ERC20;
 
-  let farmXYZStrategy: FarmXYZStrategy;
-  let farmXYZBridge: FarmXYZBridge;
+  let farmXYZStrategy: FarmStrategy;
+  let farmXYZBridge: FarmXYZPlatformBridge;
   let xAsset: XAssetBase;
 
   let owner: SignerWithAddress;
@@ -24,15 +34,17 @@ describe.only("XAssetBase", async () => {
   let joe: SignerWithAddress;
 
   beforeEach(async () => {
-    const farmContracts = await deployFarmXYZContract(_apy);
-    const assetContracts = await deployXAssetFarmContracts(farmContracts.farmXYZ);
+    const farmContracts = await deployFarmXYZTestContracts(_apy);
+    const assetContracts = await deployXAssetFarmContracts(farmContracts.farmXYZFarm, farmContracts.usdToken);
 
+    usdToken = farmContracts.usdToken;
     rewardToken = farmContracts.rewardToken;
     stakeToken = farmContracts.stakeToken;
-    farmXYZ = farmContracts.farmXYZ;
+    farmXYZFarm = farmContracts.farmXYZFarm;
     farmXYZBridge = assetContracts.bridge;
     farmXYZStrategy = assetContracts.strategy;
-    xAsset = assetContracts.asset;
+    xAsset = assetContracts.asset as XAssetBase;
+    shareToken = assetContracts.shareToken as ERC20;
 
     [owner, john, joe] = await ethers.getSigners();
 
@@ -47,7 +59,7 @@ describe.only("XAssetBase", async () => {
     it("should initialize", async () => {
       expect(rewardToken).to.be.ok;
       expect(stakeToken).to.be.ok;
-      expect(farmXYZ).to.be.ok;
+      expect(farmXYZFarm).to.be.ok;
       expect(farmXYZBridge).to.be.ok;
       expect(farmXYZStrategy).to.be.ok;
       expect(xAsset).to.be.ok;
@@ -59,9 +71,9 @@ describe.only("XAssetBase", async () => {
     it.only('should allow users to invest a specific token amount', async () => {
       const amount = ethers.utils.parseEther("10");
 
-      const sharesBefore = await xAsset.totalShares();
-      await xAsset.connect(john).invest(BASE_TOKEN, amount);
-      const sharesAfter = await xAsset.totalShares();
+      const sharesBefore = await shareToken.totalSupply();
+      await xAsset.connect(john).invest(usdToken.address, amount);
+      const sharesAfter = await shareToken.totalSupply();
 
       expect(sharesAfter).to.greaterThan(sharesBefore);
     })
@@ -70,7 +82,7 @@ describe.only("XAssetBase", async () => {
       const amount = ethers.utils.parseEther("10");
 
       const sharesBefore = await xAsset.getTotalValueOwnedBy(john.address);
-      await xAsset.connect(john).invest(BASE_TOKEN, amount);
+      await xAsset.connect(john).invest(usdToken.address, amount);
       const sharesAfter = await xAsset.getTotalValueOwnedBy(john.address);
 
       expect(sharesAfter).to.greaterThan(sharesBefore);
@@ -84,7 +96,7 @@ describe.only("XAssetBase", async () => {
       const amount = ethers.utils.parseEther("10");
       const pricePerShareBefore = await xAsset.getSharePrice();
 
-      await xAsset.connect(john).invest(BASE_TOKEN, amount);
+      await xAsset.connect(john).invest(usdToken.address, amount);
       const pricePerShareAfter = await xAsset.getSharePrice();
 
       expect(pricePerShareAfter).to.eq(pricePerShareBefore);
@@ -97,20 +109,20 @@ describe.only("XAssetBase", async () => {
     })
 
     it('should return total number of shares minted', async () => {
-      const totalShares = await xAsset.totalShares();
+      const totalShares = await shareToken.totalSupply();
 
       expect(totalShares).to.greaterThan(ethers.utils.parseEther("0"));
     })
 
     it('should allow users to withdraw a specific amount of shares and receive an amount of tokens', async () => {
       // invest 100 tokens
-      await xAsset.connect(john).invest(BASE_TOKEN, ethers.utils.parseEther("100"));
+      await xAsset.connect(john).invest(usdToken.address, ethers.utils.parseEther("100"));
 
       let ownedShares = await xAsset.getTotalValueOwnedBy(john.address);
       const halfOwnedShares = ownedShares.div(BigNumber.from(2));
 
       // withdraw half of the shares
-      await xAsset.connect(john).withdraw(BASE_TOKEN, halfOwnedShares);
+      await xAsset.connect(john).withdraw(halfOwnedShares);
 
       ownedShares = await xAsset.getTotalValueOwnedBy(john.address);
 
@@ -122,7 +134,7 @@ describe.only("XAssetBase", async () => {
       const valueOwnedBefore = await xAsset.getTotalValueOwnedBy(john.address);
 
       // invest some tokens
-      await xAsset.connect(john.address).invest(ethers.utils.parseEther("10"));
+      await xAsset.connect(john.address).invest(usdToken.address, ethers.utils.parseEther("10"));
 
       // calculate how many shares the user has after investing
       const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(john.address);
@@ -131,7 +143,7 @@ describe.only("XAssetBase", async () => {
     })
 
     it('should calculate the amount of shares received for a specified token and amount', async () => {
-      const valueOwnedBefore = await xAsset.getPrice();
+      const valueOwnedBefore = await xAsset.getSharePrice();
     })
   });
 });

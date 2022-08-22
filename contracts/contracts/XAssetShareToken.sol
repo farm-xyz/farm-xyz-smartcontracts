@@ -4,10 +4,12 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "hardhat/console.sol";
 
-abstract contract XAssetShareToken is ERC20PermitUpgradeable, OwnableUpgradeable {
+contract XAssetShareToken is ERC20PermitUpgradeable, OwnableUpgradeable {
 
     function initialize(string memory name_, string memory symbol_) initializer public {
+        console.log("XAssetShareToken initialize ", name_, symbol_);
         __ERC20_init(name_, symbol_);
         __ERC20Permit_init(name_);
     }

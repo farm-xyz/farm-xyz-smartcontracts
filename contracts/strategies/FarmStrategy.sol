@@ -17,7 +17,6 @@ contract FarmStrategy is IXStrategy, Ownable {
 
     IXPlatformBridge private bridge;
 
-    IXAsset private xAsset;
     IERC20 private farm;
     IERC20Metadata private baseToken;
 
@@ -25,18 +24,15 @@ contract FarmStrategy is IXStrategy, Ownable {
 
     /**
      * @param _bridge - The strategy used to manage actions between investment assets
-     * @param _xAsset - The parent asset
      * @param _farm - The farm used for investing
      * @param _baseToken - The base token used for different conversion
      */
     constructor(IXPlatformBridge _bridge,
-        IXAsset _xAsset,
         IERC20 _farm,
         IERC20Metadata _baseToken) {
         // todo: add xAsset, pool param, add baseToken, assets to convert to
 
         bridge = _bridge;
-        xAsset = _xAsset;
         farm = _farm;
         baseToken = _baseToken;
     }

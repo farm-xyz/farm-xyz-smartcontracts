@@ -2,8 +2,10 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@opengsn/contracts/src/ERC2771Recipient.sol";
 import "hardhat/console.sol";
 import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
@@ -19,7 +21,7 @@ import "../FarmXYZBase.sol";
 // todo #6: share value conversion in x-base-token
 // zapper - conversie automata
 
-contract XAssetBase is IXAsset, OwnableUpgradeable {
+contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
 
     /**
      * The name of this XASSET
@@ -36,7 +38,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
      */
     XAssetShareToken private _shareToken;
 
-    bool private _strategyIsInitialized = false;
+    bool private _strategyIsInitialized;
 
     /**
      * The strategy used to manage actions between investment assets.
@@ -46,7 +48,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
     /**
      * The total no of virtualShares invested in virtual assets using the strategy.
      */
-    uint256 private _totalVirtualShares = 0;
+    uint256 private _totalVirtualShares;
 
     /**
      * @dev Emitted when `value` tokens are invested into an XAsset
@@ -69,6 +71,8 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
         _name = name_;
         _baseToken = baseToken_;
         _shareToken = shareToken_;
+        _strategyIsInitialized = false;
+        _totalVirtualShares = 0;
     }
 
     /**
@@ -80,6 +84,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
 
     function setStrategy(IXStrategy strategy_) public onlyOwner {
         require(!_strategyIsInitialized, "Strategy is already initialized");
+        console.log("Setting strategy to ", address(strategy_));
         _strategyIsInitialized = true;
         _strategy = strategy_;
 
@@ -98,7 +103,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
         uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
         uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
         uint256 newSharesToMint = totalAssetValueInvested/pricePerShareBeforeInvest;
-        _shareToken.mint(msg.sender, newSharesToMint);
+        _shareToken.mint(_msgSender(), newSharesToMint);
         uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
         require(pricePerShareAfterInvest == pricePerShareBeforeInvest, "Price per share changed");
     }
@@ -113,11 +118,11 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
 
     function withdraw(uint256 shares) override external {
         console.log('withdraw', shares);
-        require(_shareToken.balanceOf(msg.sender) >= shares, "Not enough shares");
+        require(_shareToken.balanceOf(_msgSender()) >= shares, "Not enough shares");
         uint256 totalAssetValueBeforeWithdraw = _strategy.getTotalAssetValue();
         uint256 pricePerShareBeforeWithdraw = totalAssetValueBeforeWithdraw / _shareToken.totalSupply();
         _strategy.withdraw(pricePerShareBeforeWithdraw * shares, _baseToken, 50);
-        _shareToken.burn(msg.sender, shares);
+        _shareToken.burn(_msgSender(), shares);
         uint256 totalAssetValueAfterWithdraw = _strategy.getTotalAssetValue();
         uint256 pricePerShareAfterWithdraw = totalAssetValueAfterWithdraw / _shareToken.totalSupply();
         require(pricePerShareAfterWithdraw == pricePerShareBeforeWithdraw, "Price per share changed");
@@ -154,5 +159,17 @@ contract XAssetBase is IXAsset, OwnableUpgradeable {
      */
     function getTotalValueOwnedBy(address account) override external view returns (uint256) {
         return _shareToken.balanceOf(account) * this.getSharePrice();
+    }
+
+    function shareToken() override external view returns (IERC20MetadataUpgradeable) {
+        return _shareToken;
+    }
+
+    function _msgSender() internal override(ERC2771Recipient, ContextUpgradeable) virtual view returns (address ret) {
+        return ERC2771Recipient._msgSender();
+    }
+
+    function _msgData() internal override(ERC2771Recipient, ContextUpgradeable) virtual view returns (bytes calldata ret) {
+        return ERC2771Recipient._msgData();
     }
 }

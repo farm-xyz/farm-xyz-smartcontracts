@@ -2,6 +2,7 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 interface IXAsset {
 
@@ -36,4 +37,8 @@ interface IXAsset {
      */
     function getTotalValueOwnedBy(address account) external view returns (uint256);
 
+    /**
+     * @return The token that keeps track of the shares of this XASSET
+     */
+    function shareToken() external view returns (IERC20MetadataUpgradeable);
 }

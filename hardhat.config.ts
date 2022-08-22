@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import {HardhatUserConfig, task} from "hardhat/config";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-ethers";
+import '@openzeppelin/hardhat-upgrades';
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-web3";
 import "@typechain/hardhat";
@@ -40,8 +41,8 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: ETH_MAINNET_RPC_PROVIDER as string,
-        blockNumber: 13889838
+        url: POLYGON_RPC_PROVIDER as string,
+        blockNumber: 32126601
       }
     },
     ropsten: {
