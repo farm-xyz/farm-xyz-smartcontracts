@@ -104,7 +104,9 @@ describe.only("XAssetBase", async () => {
     })
 
     it('should calculate price per share with no investments in the XASSET', async () => {
-      // todo: test with no investments
+      const sharePrice = await xAsset.getSharePrice();
+
+      expect(sharePrice).to.greaterThan(ethers.utils.parseEther("0"));
     })
 
     it('should calculate price per share', async () => {
@@ -144,7 +146,7 @@ describe.only("XAssetBase", async () => {
       // withdraw half of the shares
       await xAsset.connect(john).withdraw(halfOwnedShares);
 
-      ownedShares = await xAsset.getTotalValueOwnedBy(john.address);
+      ownedShares = await xAsset.getTotalSharesOwnedBy(john.address);
 
       expect(halfOwnedShares).to.eq(ownedShares);
     })
