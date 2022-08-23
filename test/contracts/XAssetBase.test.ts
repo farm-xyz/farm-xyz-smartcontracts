@@ -78,6 +78,21 @@ describe.only("XAssetBase", async () => {
       expect(sharesAfter).to.greaterThan(sharesBefore);
     })
 
+    it.only('should allow multiple users to invest a specific token amount', async () => {
+      const amount = ethers.utils.parseEther("10");
+
+      const sharesBefore = await shareToken.totalSupply();
+      await xAsset.connect(john).invest(usdToken.address, amount);
+      const sharesAfter = await shareToken.totalSupply();
+
+      expect(sharesAfter).to.greaterThan(sharesBefore);
+
+      await xAsset.connect(joe).invest(usdToken.address, amount);
+      const sharesAfter2 = await shareToken.totalSupply();
+
+      expect(sharesAfter2).to.greaterThan(sharesAfter);
+    })
+
     it('should allocate shares for the specific investment', async () => {
       const amount = ethers.utils.parseEther("10");
 

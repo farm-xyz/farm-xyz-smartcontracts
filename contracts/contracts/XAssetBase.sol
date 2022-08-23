@@ -94,18 +94,41 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
         _totalVirtualShares = 100;
     }
 
+    /**
+     * @return The price per one share of the XASSET
+     */
+    function getSharePrice() override external view returns (uint256) {
+        uint256 totalVirtualAssetsValue = _strategy.getTotalVirtualAssetValue();
+        uint256 sharePrice = totalVirtualAssetsValue / _totalVirtualShares;
+        console.log('getSharePrice', sharePrice);
+        return sharePrice;
+    }
+
     function invest(IERC20Metadata token, uint256 amount) override external {
         console.log('invest', address(token), amount);
 
-        uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
-        uint256 pricePerShareBeforeInvest = totalAssetValueBeforeInvest/ _shareToken.totalSupply();
-        _strategy.invest(token, amount, 50);
-        uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
-        uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
-        uint256 newSharesToMint = totalAssetValueInvested/pricePerShareBeforeInvest;
-        _shareToken.mint(_msgSender(), newSharesToMint);
-        uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
-        require(pricePerShareAfterInvest == pricePerShareBeforeInvest, "Price per share changed");
+        if ( _shareToken.totalSupply()== 0 ) {
+            console.log("Initial investment into XASSET");
+            uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
+            require(totalAssetValueBeforeInvest == 0, "Strategy should have no assets since no shares have been issued");
+            _strategy.invest(token, amount, 50);
+            uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
+            uint256 sharePrice = this.getSharePrice();
+            uint256 newSharesToMint = totalAssetValueAfterInvest/sharePrice;
+            _shareToken.mint(_msgSender(), newSharesToMint);
+            uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
+            require(pricePerShareAfterInvest == sharePrice, "Price per share can not change after initial investment");
+        } else {
+            uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
+            uint256 pricePerShareBeforeInvest = totalAssetValueBeforeInvest/ _shareToken.totalSupply();
+            _strategy.invest(token, amount, 50);
+            uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
+            uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
+            uint256 newSharesToMint = totalAssetValueInvested/pricePerShareBeforeInvest;
+            _shareToken.mint(_msgSender(), newSharesToMint);
+            uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
+            require(pricePerShareAfterInvest == pricePerShareBeforeInvest, "Price per share can not change after investment");
+        }
     }
 
     function estimateSharesForInvestmentAmount(IERC20Metadata token, uint256 amount) external view returns (uint256) {
@@ -135,16 +158,6 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
      */
     function getValueForShares(uint256 amount) override external view returns (uint256) {
         return this.getSharePrice() * amount;
-    }
-
-    /**
-     * @return The price per one share of the XASSET
-     */
-    function getSharePrice() override external view returns (uint256) {
-        uint256 totalVirtualAssetsValue = _strategy.getTotalVirtualAssetValue();
-        uint256 sharePrice = totalVirtualAssetsValue / _totalVirtualShares;
-        console.log('getSharePrice', sharePrice);
-        return sharePrice;
     }
 
     /**

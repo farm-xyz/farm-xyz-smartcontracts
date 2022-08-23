@@ -50,6 +50,7 @@ export async function deployXAssetFarmContracts(farmXYZ: FarmXYZBase, usdToken: 
   const xassetProxy = await upgrades.deployProxy(XAssetBase, [ "X-TFAMRX", usdToken.address, shareToken.address ]);
   await xassetProxy.deployed();
   await (xassetProxy as XAssetBase).setStrategy(strategy.address);
+  await shareToken.transferOwnership(xassetProxy.address);
 
   await Promise.all([
     bridge.deployed(),

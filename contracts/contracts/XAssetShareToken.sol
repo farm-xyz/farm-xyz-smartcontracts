@@ -12,6 +12,7 @@ contract XAssetShareToken is ERC20PermitUpgradeable, OwnableUpgradeable {
         console.log("XAssetShareToken initialize ", name_, symbol_);
         __ERC20_init(name_, symbol_);
         __ERC20Permit_init(name_);
+        __Ownable_init();
     }
 
     // Ownable de catre XAssetBase
