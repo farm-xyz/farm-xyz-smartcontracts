@@ -111,12 +111,18 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
             console.log("Initial investment into XASSET");
             uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
             require(totalAssetValueBeforeInvest == 0, "Strategy should have no assets since no shares have been issued");
+            console.log("Will invest ", amount, " tokens using strategy");
             _strategy.invest(token, amount, 50);
             uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
+            console.log("Total asset value after invest: ", totalAssetValueAfterInvest);
             uint256 sharePrice = this.getSharePrice();
+            console.log("Share price: ", sharePrice);
             uint256 newSharesToMint = totalAssetValueAfterInvest/sharePrice;
+            console.log("New shares to mint: ", newSharesToMint);
             _shareToken.mint(_msgSender(), newSharesToMint);
+            console.log("Total share supply: ", _shareToken.totalSupply());
             uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
+            console.log("Price per share after invest: ", pricePerShareAfterInvest);
             require(pricePerShareAfterInvest == sharePrice, "Price per share can not change after initial investment");
         } else {
             uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
@@ -168,10 +174,17 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
     }
 
     /**
+     * @return Total shares owned by address in this xAsset
+     */
+    function getTotalSharesOwnedBy(address account) override external view returns (uint256) {
+        return _shareToken.balanceOf(account);
+    }
+
+    /**
      * @return Total value invested by address in this xAsset, in baseToken
      */
     function getTotalValueOwnedBy(address account) override external view returns (uint256) {
-        return _shareToken.balanceOf(account) * this.getSharePrice();
+        return this.getTotalSharesOwnedBy(account) * this.getSharePrice();
     }
 
     function shareToken() override external view returns (IERC20MetadataUpgradeable) {

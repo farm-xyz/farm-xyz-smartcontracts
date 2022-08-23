@@ -15,26 +15,28 @@ contract FarmStrategy is IXStrategy, Ownable {
 
     string public name = "FarmStrategy";
 
-    IXPlatformBridge private bridge;
+    IXPlatformBridge private _bridge;
 
-    IERC20 private farm;
-    IERC20Metadata private baseToken;
+    IERC20 private _farm;
+    IERC20Metadata private _baseToken;
+
+    uint256 private _totalLockedValue;
 
     mapping(address => uint256) private totalVirtualAssets;
 
     /**
-     * @param _bridge - The strategy used to manage actions between investment assets
-     * @param _farm - The farm used for investing
-     * @param _baseToken - The base token used for different conversion
+     * @param bridge_ - The strategy used to manage actions between investment assets
+     * @param farm_ - The farm used for investing
+     * @param baseToken_ - The base token used for different conversion
      */
-    constructor(IXPlatformBridge _bridge,
-        IERC20 _farm,
-        IERC20Metadata _baseToken) {
+    constructor(IXPlatformBridge bridge_,
+        IERC20 farm_,
+        IERC20Metadata baseToken_) {
         // todo: add xAsset, pool param, add baseToken, assets to convert to
 
-        bridge = _bridge;
-        farm = _farm;
-        baseToken = _baseToken;
+        _bridge = bridge_;
+        _farm = farm_;
+        _baseToken = baseToken_;
     }
 
     // invest(token, amount, slippage) -> returns the amount invested in baseTokens
@@ -43,7 +45,8 @@ contract FarmStrategy is IXStrategy, Ownable {
     //  -> stake converted assets to pool
     //  -> returns baseToken amount invested
     function invest(IERC20Metadata token, uint256 amount, int slippage) override external returns (uint256) {
-        return 0;
+        _totalLockedValue += amount;
+        return amount;
     }
 
     // withdraw(amount, toToken, amount?, slippage?) ->
@@ -53,6 +56,7 @@ contract FarmStrategy is IXStrategy, Ownable {
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
     function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
+        _totalLockedValue -= amount;
         return 0;
     }
 
@@ -65,20 +69,20 @@ contract FarmStrategy is IXStrategy, Ownable {
 
     // getTotalAssetValue() -> returns baseToken amount of all assets owned by the XAsset
     function getTotalAssetValue() override view external returns (uint256) {
-        return 0;
+        return _totalLockedValue;
     }
 
     /**
      * @return The total value of the virtually invested assets
      */
     function getTotalVirtualAssetValue() override view external returns (uint256) {
-        return 1000;
+        return 1000*(10**_baseToken.decimals());
     }
 
     /**
      * @dev Virtually invest some tokens in the pool/farm, returns the total amount of baseTokens "invested"
      */
     function virtualInvest(uint256 amount) override view external returns (uint256) {
-        return 1000;
+        return 1000*(10**_baseToken.decimals());
     }
 }

@@ -33,6 +33,11 @@ interface IXAsset {
     function getTVL() external view returns (uint256);
 
     /**
+     * @return Total shares owned by address in this xAsset
+     */
+    function getTotalSharesOwnedBy(address account) external view returns (uint256);
+
+    /**
      * @return Total value invested by address in this xAsset, in baseToken
      */
     function getTotalValueOwnedBy(address account) external view returns (uint256);
