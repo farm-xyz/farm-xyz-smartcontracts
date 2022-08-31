@@ -40,10 +40,10 @@ const config: HardhatUserConfig = {
   solidity: "0.8.4",
   networks: {
     hardhat: {
-      forking: {
-        url: POLYGON_RPC_PROVIDER as string,
-        blockNumber: 32126601
-      }
+      // forking: {
+      //   url: POLYGON_RPC_PROVIDER as string,
+      //   blockNumber: 32126601
+      // }
     },
     ropsten: {
       url: ETH_ROPSTEN_RPC_PROVIDER,

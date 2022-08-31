@@ -39,6 +39,6 @@ interface IXStrategy {
     /**
      * @dev Virtually invest some tokens in the pool/farm, returns the total amount of baseTokens "invested"
      */
-    function virtualInvest(uint256 amount) external view returns (uint256);
+    function virtualInvest(uint256 amount) external returns (uint256);
 
 }

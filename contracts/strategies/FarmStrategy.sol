@@ -3,41 +3,53 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
 import "./IXStrategy.sol";
 import "../bridges/IXPlatformBridge.sol";
 import "../contracts/IXAsset.sol";
+import "../FarmXYZBase.sol";
+import "../utils/Trigonometry.sol";
 
 // todo: we'll have multiple strategy types: LPStrategy, LPFarmStrategy, FarmStrategy, MultifarmStrategy, etc.
-contract FarmStrategy is IXStrategy, Ownable {
+contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
 
-    string public name = "FarmStrategy";
+    string public name;
 
     IXPlatformBridge private _bridge;
 
-    IERC20 private _farm;
+    FarmXYZBase private _farm;
     IERC20Metadata private _baseToken;
 
     uint256 private _totalLockedValue;
 
-    mapping(address => uint256) private totalVirtualAssets;
+    uint256 private _virtualSharesInvestmentStartTime;
+
+
 
     /**
      * @param bridge_ - The strategy used to manage actions between investment assets
      * @param farm_ - The farm used for investing
      * @param baseToken_ - The base token used for different conversion
      */
-    constructor(IXPlatformBridge bridge_,
-        IERC20 farm_,
-        IERC20Metadata baseToken_) {
+    /**
+     */
+    function initialize(IXPlatformBridge bridge_,
+        FarmXYZBase farm_,
+        IERC20Metadata baseToken_) initializer external {
+        __UUPSUpgradeable_init();
+
+        name = "FarmStrategy";
         // todo: add xAsset, pool param, add baseToken, assets to convert to
 
         _bridge = bridge_;
         _farm = farm_;
         _baseToken = baseToken_;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // invest(token, amount, slippage) -> returns the amount invested in baseTokens
     //  -> uses PlatformBridge to find amount of tokens to convert to based on the target pool
@@ -56,12 +68,13 @@ contract FarmStrategy is IXStrategy, Ownable {
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
     function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
+        console.log('----- [strategy:withdraw] tvl %s amount %s', _totalLockedValue/1 ether, amount/1 ether);
         _totalLockedValue -= amount;
-        return 0;
+        return amount;
     }
 
     function convert(IERC20Metadata token, uint256 amount) view override public returns (uint256) {
-        console.log('[convert]', amount, address(token));
+        console.log('---- [strategy:convert]', amount/1 ether, address(token));
         // TODO: handle conversion between token & assets
 
         return amount;
@@ -76,13 +89,22 @@ contract FarmStrategy is IXStrategy, Ownable {
      * @return The total value of the virtually invested assets
      */
     function getTotalVirtualAssetValue() override view external returns (uint256) {
-        return 1000*(10**_baseToken.decimals());
+        // Let's do a sine function price to have a nice graph to test with
+        uint256 denominator = 10**_baseToken.decimals();
+        uint256 origPrice = 1000*denominator;
+        uint256 secs = block.timestamp - _virtualSharesInvestmentStartTime;
+        uint256 sin = uint256(32767 + Trigonometry.sin(uint16(secs % (2**16))))*denominator;
+        uint256 priceDiff = (sin/(65534*denominator)) * 500;
+        uint256 price = origPrice+priceDiff;
+        console.log("---- [strategy:getTotalVirtualAssetValue] => %s", price/1 ether);
+        return price;
     }
 
     /**
      * @dev Virtually invest some tokens in the pool/farm, returns the total amount of baseTokens "invested"
      */
-    function virtualInvest(uint256 amount) override view external returns (uint256) {
+    function virtualInvest(uint256 amount) override external returns (uint256) {
+        _virtualSharesInvestmentStartTime = block.timestamp;
         return 1000*(10**_baseToken.decimals());
     }
 }

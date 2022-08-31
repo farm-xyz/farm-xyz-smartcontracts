@@ -11,7 +11,6 @@ import {
   IXAsset,
   XAssetShareToken
 } from "../../typechain";
-import {Contract} from "ethers";
 
 export async function deployFarmXYZTestContracts(_apy: number): Promise<{ rewardToken: RFarmXToken, stakeToken: TFarmXToken, farmXYZFarm: FarmXYZBase, usdToken: ERC20 }> {
   const RFarmXToken = await ethers.getContractFactory("RFarmXToken");
@@ -34,20 +33,26 @@ export async function deployFarmXYZTestContracts(_apy: number): Promise<{ reward
   return {rewardToken, stakeToken, farmXYZFarm, usdToken};
 }
 
-export async function deployXAssetFarmContracts(farmXYZ: FarmXYZBase, usdToken: ERC20): Promise<{ asset: Contract, strategy: FarmStrategy, bridge: FarmXYZPlatformBridge, shareToken: Contract }> {
+export async function deployXAssetFarmContracts(farmXYZ: FarmXYZBase, usdToken: ERC20): Promise<{ asset: XAssetBase, strategy: FarmStrategy, bridge: FarmXYZPlatformBridge, shareToken: ERC20 }> {
+  upgrades.silenceWarnings();
   const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
-  const FarmStrategy = await ethers.getContractFactory("FarmStrategy");
+  const Trigonometry = await ethers.getContractFactory("Trigonometry");
+  const Trig = await Trigonometry.deploy();
+  const FarmStrategy = await ethers.getContractFactory("FarmStrategy", {libraries: {
+    Trigonometry: Trig.address
+  }});
   const XAssetBase = await ethers.getContractFactory("XAssetBase");
   const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
   // TODO: Set GSN forwarder & integrate GSN from https://github.com/opengsn/workshop
 
-  const bridge = await FarmXYZPlatformBridge.deploy(farmXYZ.address);
-  const strategy = await FarmStrategy.deploy(bridge.address, farmXYZ.address, usdToken.address);
-  // @ts-ignore
-  const shareToken = await upgrades.deployProxy(XAssetShareToken, [ "X-TRARMX XASSET Shares", "X-TFARMX" ]);
+  const bridge = await upgrades.deployProxy(FarmXYZPlatformBridge, [], { kind: "uups" });
+  await bridge.deployed();
+  const strategy = await upgrades.deployProxy(FarmStrategy, [bridge.address, farmXYZ.address, usdToken.address], { kind: "uups", unsafeAllowLinkedLibraries: true });
+
+  const shareToken = await upgrades.deployProxy(XAssetShareToken, [ "X-TFARMX XASSET Shares", "X-TFARMX" ], { kind: "uups" });
   await shareToken.deployed();
 
-  const xassetProxy = await upgrades.deployProxy(XAssetBase, [ "X-TFAMRX", usdToken.address, shareToken.address ]);
+  const xassetProxy = await upgrades.deployProxy(XAssetBase, [ "X-TFAMRX", usdToken.address, shareToken.address ], { kind: "uups" });
   await xassetProxy.deployed();
   await (xassetProxy as XAssetBase).setStrategy(strategy.address);
   await shareToken.transferOwnership(xassetProxy.address);
@@ -58,5 +63,9 @@ export async function deployXAssetFarmContracts(farmXYZ: FarmXYZBase, usdToken: 
     xassetProxy.deployed(),
   ]);
 
-  return {asset: xassetProxy, strategy, bridge, shareToken};
+  return {
+    asset: xassetProxy as unknown as XAssetBase,
+    strategy: strategy as unknown as FarmStrategy,
+    bridge: bridge as unknown as FarmXYZPlatformBridge,
+    shareToken: shareToken as unknown as ERC20};
 }

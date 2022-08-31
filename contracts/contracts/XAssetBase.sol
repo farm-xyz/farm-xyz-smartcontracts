@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@opengsn/contracts/src/ERC2771Recipient.sol";
 import "hardhat/console.sol";
 import "./IXAsset.sol";
@@ -21,7 +22,7 @@ import "../FarmXYZBase.sol";
 // todo #6: share value conversion in x-base-token
 // zapper - conversie automata
 
-contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
+contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgradeable {
 
     /**
      * The name of this XASSET
@@ -67,12 +68,19 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
      */
     function initialize(string calldata name_, IERC20Metadata baseToken_, XAssetShareToken shareToken_) initializer external {
         __Ownable_init();
+        __UUPSUpgradeable_init();
 
         _name = name_;
         _baseToken = baseToken_;
         _shareToken = shareToken_;
         _strategyIsInitialized = false;
         _totalVirtualShares = 0;
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function setTrustedForwarder(address _forwarder) public onlyOwner {
+        _setTrustedForwarder(_forwarder);
     }
 
     /**
@@ -84,7 +92,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
 
     function setStrategy(IXStrategy strategy_) public onlyOwner {
         require(!_strategyIsInitialized, "Strategy is already initialized");
-        console.log("Setting strategy to ", address(strategy_));
+        console.log("---- [xasset:setStrategy] ", address(strategy_));
         _strategyIsInitialized = true;
         _strategy = strategy_;
 
@@ -100,29 +108,29 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
     function getSharePrice() override external view returns (uint256) {
         uint256 totalVirtualAssetsValue = _strategy.getTotalVirtualAssetValue();
         uint256 sharePrice = totalVirtualAssetsValue / _totalVirtualShares;
-        console.log('getSharePrice', sharePrice);
+        console.log('---- [xasset:getSharePrice] => ', sharePrice/1 ether);
         return sharePrice;
     }
 
     function invest(IERC20Metadata token, uint256 amount) override external {
-        console.log('invest', address(token), amount);
+        console.log('---- [xasset:invest]', address(token), amount);
 
         if ( _shareToken.totalSupply()== 0 ) {
             console.log("Initial investment into XASSET");
             uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
             require(totalAssetValueBeforeInvest == 0, "Strategy should have no assets since no shares have been issued");
-            console.log("Will invest ", amount, " tokens using strategy");
+            console.log("Will invest %s tokens using strategy", amount/1 ether);
             _strategy.invest(token, amount, 50);
             uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
-            console.log("Total asset value after invest: ", totalAssetValueAfterInvest);
+            console.log("Total asset value after invest: ", totalAssetValueAfterInvest/1 ether);
             uint256 sharePrice = this.getSharePrice();
-            console.log("Share price: ", sharePrice);
+            console.log("Share price: ", sharePrice/1 ether);
             uint256 newSharesToMint = totalAssetValueAfterInvest/sharePrice;
             console.log("New shares to mint: ", newSharesToMint);
             _shareToken.mint(_msgSender(), newSharesToMint);
             console.log("Total share supply: ", _shareToken.totalSupply());
             uint256 pricePerShareAfterInvest = totalAssetValueAfterInvest/ _shareToken.totalSupply();
-            console.log("Price per share after invest: ", pricePerShareAfterInvest);
+            console.log("Price per share after invest: ", pricePerShareAfterInvest/1 ether);
             require(pricePerShareAfterInvest == sharePrice, "Price per share can not change after initial investment");
         } else {
             uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
@@ -139,18 +147,22 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
 
     function estimateSharesForInvestmentAmount(IERC20Metadata token, uint256 amount) external view returns (uint256) {
         uint256 totalAssetValue = _strategy.getTotalAssetValue();
-        uint256 pricePerShare = totalAssetValue/ _shareToken.totalSupply();
+        uint256 pricePerShare = this.getSharePrice();
         uint256 baseTokenAmount = _strategy.convert(token, amount);
         uint256 shares = baseTokenAmount/pricePerShare;
         return shares;
     }
 
     function withdraw(uint256 shares) override external {
-        console.log('withdraw', shares);
+        console.log('---- [xasset:withdraw]', shares);
         require(_shareToken.balanceOf(_msgSender()) >= shares, "Not enough shares");
         uint256 totalAssetValueBeforeWithdraw = _strategy.getTotalAssetValue();
+        console.log("Total asset value before withdraw: ", totalAssetValueBeforeWithdraw/1 ether);
         uint256 pricePerShareBeforeWithdraw = totalAssetValueBeforeWithdraw / _shareToken.totalSupply();
-        _strategy.withdraw(pricePerShareBeforeWithdraw * shares, _baseToken, 50);
+        console.log("Price per share before withdraw: ", pricePerShareBeforeWithdraw/1 ether);
+        uint256 amountToWithdraw = shares * pricePerShareBeforeWithdraw;
+        uint256 withdrawn = _strategy.withdraw(amountToWithdraw, _baseToken, 50);
+        require(withdrawn == amountToWithdraw, "Withdrawal amount does not match");
         _shareToken.burn(_msgSender(), shares);
         uint256 totalAssetValueAfterWithdraw = _strategy.getTotalAssetValue();
         uint256 pricePerShareAfterWithdraw = totalAssetValueAfterWithdraw / _shareToken.totalSupply();
@@ -184,7 +196,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient {
      * @return Total value invested by address in this xAsset, in baseToken
      */
     function getTotalValueOwnedBy(address account) override external view returns (uint256) {
-        return this.getTotalSharesOwnedBy(account) * this.getSharePrice();
+        uint256 totalValue = this.getTotalSharesOwnedBy(account) * this.getSharePrice();
+        console.log("---- [xasset:getTotalValueOwnedBy] => %s*%s = %s", this.getTotalSharesOwnedBy(account), this.getSharePrice()/1 ether, totalValue/1 ether);
+        return totalValue;
     }
 
     function shareToken() override external view returns (IERC20MetadataUpgradeable) {
