@@ -9,10 +9,11 @@ import {
   ERC20
 } from "../../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { ethers } from "hardhat";
+import {ethers, web3} from "hardhat";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { deployFarmXYZTestContracts, deployXAssetFarmContracts } from "../helpers/helpers";
+import {mine} from "@nomicfoundation/hardhat-network-helpers";
 
 describe.only("XAssetBase", async () => {
   const _apy: number = 120;  // percentage > 0
@@ -116,7 +117,25 @@ describe.only("XAssetBase", async () => {
       await xAsset.connect(john).invest(usdToken.address, amount);
       const pricePerShareAfter = await xAsset.getSharePrice();
 
-      expect(pricePerShareAfter).to.eq(pricePerShareBefore);
+      expect(pricePerShareAfter.sub(pricePerShareBefore)).to.be.lt(10);
+    })
+
+    it('should return new price once a new block is mined', async () => {
+      let pricePerShareBefore = await xAsset.getSharePrice();
+      await mine(1000);
+      let pricePerShareAfter = await xAsset.getSharePrice();
+      expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+      pricePerShareBefore = pricePerShareAfter;
+      await mine(5000);
+      pricePerShareAfter = await xAsset.getSharePrice();
+      expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+      pricePerShareBefore = pricePerShareAfter;
+      await mine(7000);
+      pricePerShareAfter = await xAsset.getSharePrice();
+      expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+      await mine(8000);
+      pricePerShareAfter = await xAsset.getSharePrice();
+      expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
     })
 
     it('should calculate total value locked', async () => {
@@ -151,33 +170,37 @@ describe.only("XAssetBase", async () => {
       const amount = ethers.utils.parseEther("100");
       await xAsset.connect(john).invest(usdToken.address, amount);
 
+      const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(john.address);
       let ownedShares = await xAsset.getTotalSharesOwnedBy(john.address);
+      console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
       const halfOwnedShares = ownedShares.div(BigNumber.from(2));
 
       // withdraw half of the shares
       await xAsset.connect(john).withdraw(halfOwnedShares);
+      // TODO: check balances!!!!
 
       ownedShares = await xAsset.getTotalSharesOwnedBy(john.address);
+      console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
 
-      expect(halfOwnedShares).to.eq(ownedShares);
+      expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
 
-      const valueAfterWithdraw = await xAsset.getTotalValueOwnedBy(john.address);
-
-      expect(valueAfterWithdraw).to.eq(amount.div(2));
     })
 
     it('should calculate the total value owned by an address', async () => {
       const amount = ethers.utils.parseEther("10");
-      // calculate how many shares the user has initially
+      // calculate how many $ the user has initially
       const valueOwnedBefore = await xAsset.getTotalValueOwnedBy(john.address);
 
       // invest some tokens
       await xAsset.connect(john).invest(usdToken.address, amount);
 
-      // calculate how many shares the user has after investing
+      // calculate how many $ the user has after investing
       const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(john.address);
+      console.log('valueOwnedAfter', web3.utils.fromWei(valueOwnedAfter.toString()));
 
-      expect(valueOwnedAfter).to.eq(amount);
+      const valueDifference = valueOwnedAfter.sub(amount).abs();
+      console.log('valueDifference', web3.utils.fromWei(valueDifference.toString()));
+      expect(valueDifference).to.be.lte(5);
     })
 
     it('should calculate the amount of shares received for a specified token and amount', async () => {
@@ -186,8 +209,6 @@ describe.only("XAssetBase", async () => {
 
       expect(shares).to.greaterThan(ethers.utils.parseEther("0"));
     })
-
-    // it('should update')
 
   });
 });

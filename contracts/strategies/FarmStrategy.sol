@@ -23,7 +23,7 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     FarmXYZBase private _farm;
     IERC20Metadata private _baseToken;
 
-    uint256 private _totalLockedValue;
+    uint256 private _totalValueLocked;
 
     uint256 private _virtualSharesInvestmentStartTime;
 
@@ -57,7 +57,7 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     //  -> stake converted assets to pool
     //  -> returns baseToken amount invested
     function invest(IERC20Metadata token, uint256 amount, int slippage) override external returns (uint256) {
-        _totalLockedValue += amount;
+        _totalValueLocked += amount;
         return amount;
     }
 
@@ -68,8 +68,8 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
     function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
-        console.log('----- [strategy:withdraw] tvl %s amount %s', _totalLockedValue/1 ether, amount/1 ether);
-        _totalLockedValue -= amount;
+        console.log('----- [strategy:withdraw] tvl %s amount %s', _totalValueLocked /1 ether, amount/1 ether);
+        _totalValueLocked -= amount;
         return amount;
     }
 
@@ -82,7 +82,7 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
 
     // getTotalAssetValue() -> returns baseToken amount of all assets owned by the XAsset
     function getTotalAssetValue() override view external returns (uint256) {
-        return _totalLockedValue;
+        return _totalValueLocked;
     }
 
     /**
@@ -93,10 +93,13 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
         uint256 denominator = 10**_baseToken.decimals();
         uint256 origPrice = 1000*denominator;
         uint256 secs = block.timestamp - _virtualSharesInvestmentStartTime;
-        uint256 sin = uint256(32767 + Trigonometry.sin(uint16(secs % (2**16))))*denominator;
-        uint256 priceDiff = (sin/(65534*denominator)) * 500;
+        console.log('---- [strategy:getTotalVirtualAssetValue] secs %s', secs);
+        uint256 sin = uint256(32767 + Trigonometry.sin(uint16(secs % (2**16))));
+        if (sin==0) sin=1;
+        uint256 priceDiff = ((65534*denominator)/sin) * 200;
+        console.log('sin %s percent %s diff %s', sin, ((65534*denominator)/sin), priceDiff);
         uint256 price = origPrice+priceDiff;
-        console.log("---- [strategy:getTotalVirtualAssetValue] => %s", price/1 ether);
+        console.log("=> %s.%s", price/1 ether, price%1 ether);
         return price;
     }
 
@@ -105,6 +108,6 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
      */
     function virtualInvest(uint256 amount) override external returns (uint256) {
         _virtualSharesInvestmentStartTime = block.timestamp;
-        return 1000*(10**_baseToken.decimals());
+        return amount;
     }
 }
