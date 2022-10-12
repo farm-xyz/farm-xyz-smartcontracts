@@ -7,25 +7,38 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
-import "./IXStrategy.sol";
-import "../bridges/IXPlatformBridge.sol";
-import "../contracts/IXAsset.sol";
-import "../FarmXYZBase.sol";
-import "../utils/Trigonometry.sol";
+import "../../bridges/IXPlatformBridge.sol";
+import "../../xassets/IXAsset.sol";
+import "../../strategies/IXStrategy.sol";
+import "../../farms/FarmXYZBase.sol";
+import "./ISynapsePool.sol";
 
 // todo: we'll have multiple strategy types: LPStrategy, LPFarmStrategy, FarmStrategy, MultifarmStrategy, etc.
-contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
+contract SynapseProtocolStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
+
+    address constant SYNAPSE_POOL_ADDRESS = 0x85fCD7Dd0a1e1A9FCD5FD886ED522dE8221C3EE5;
+
+    ISynapsePool private _synapsePool;
+    uint16 private _synapsePoolTokensCount;
 
     string public name;
 
     IXPlatformBridge private _bridge;
 
-    FarmXYZBase private _farm;
     IERC20Metadata private _baseToken;
+
+    /**
+     * The denominator for the base token
+     */
+    uint256 private _baseTokenDenominator;
 
     uint256 private _totalValueLocked;
 
     uint256 private _virtualSharesInvestmentStartTime;
+    uint256 private _virtualSharesInvestmentShares;
+    uint256 private _virtualSharesInvestmentStartPrice;
+
+    uint8 private _baseTokenIndex;
 
 
 
@@ -37,16 +50,21 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     /**
      */
     function initialize(IXPlatformBridge bridge_,
-        FarmXYZBase farm_,
         IERC20Metadata baseToken_) initializer external {
+        console.log("---- [SynapseProtocolStrategy.initialize]");
         __UUPSUpgradeable_init();
 
-        name = "FarmStrategy";
+        name = "SynapseProtocolStrategy";
         // todo: add xAsset, pool param, add baseToken, assets to convert to
 
         _bridge = bridge_;
-        _farm = farm_;
         _baseToken = baseToken_;
+        _baseTokenDenominator = 10 ** uint256(_baseToken.decimals());
+        _synapsePool = ISynapsePool(SYNAPSE_POOL_ADDRESS);
+        uint256[] memory tokenAmounts = _synapsePool.calculateRemoveLiquidity(1000000000000000000);
+        _synapsePoolTokensCount = uint16(tokenAmounts.length);
+        console.log("Synapse pool tokens count %s", tokenAmounts.length);
+        _baseTokenIndex = _synapsePool.getTokenIndex(address(_baseToken));
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -56,7 +74,7 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     //  -> uses DexBridge to convert token amount into target tokens, with the specific slippage
     //  -> stake converted assets to pool
     //  -> returns baseToken amount invested
-    function invest(IERC20Metadata token, uint256 amount, int slippage) override external returns (uint256) {
+    function invest(IERC20Metadata token, uint256 amount, uint256 expectedBaseTokenAmount, int slippage) override external returns (uint256) {
         _totalValueLocked += amount;
         return amount;
     }
@@ -68,13 +86,13 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
     //    -> covert to toToken, check if amount is in slippage range
     //    -> return the number of baseToken converted so the xAsset should burn the shares
     function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
-        console.log('----- [strategy:withdraw] tvl %s amount %s', _totalValueLocked /1 ether, amount/1 ether);
+        console.log('----- [SynapseProtocolStrategy:withdraw] tvl %s amount %s', _totalValueLocked /1 ether, amount/1 ether);
         _totalValueLocked -= amount;
         return amount;
     }
 
     function convert(IERC20Metadata token, uint256 amount) view override public returns (uint256) {
-        console.log('---- [strategy:convert]', amount/1 ether, address(token));
+        console.log('---- [SynapseProtocolStrategy:convert]', amount/1 ether, address(token));
         // TODO: handle conversion between token & assets
 
         return amount;
@@ -85,29 +103,10 @@ contract FarmStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
         return _totalValueLocked;
     }
 
-    /**
-     * @return The total value of the virtually invested assets
-     */
-    function getTotalVirtualAssetValue() override view external returns (uint256) {
-        // Let's do a sine function price to have a nice graph to test with
-        uint256 denominator = 10**_baseToken.decimals();
-        uint256 origPrice = 1000*denominator;
-        uint256 secs = block.timestamp - _virtualSharesInvestmentStartTime;
-        console.log('---- [strategy:getTotalVirtualAssetValue] secs %s', secs);
-        uint256 sin = uint256(32767 + Trigonometry.sin(uint16(secs % (2**16))));
-        if (sin==0) sin=1;
-        uint256 priceDiff = ((65534*denominator)/sin) * 200;
-        console.log('sin %s percent %s diff %s', sin, ((65534*denominator)/sin), priceDiff);
-        uint256 price = origPrice+priceDiff;
-        console.log("=> %s.%s", price/1 ether, price%1 ether);
-        return price;
+    function compound() override external
+    {
+        revert("Not implemented");
     }
 
-    /**
-     * @dev Virtually invest some tokens in the pool/farm, returns the total amount of baseTokens "invested"
-     */
-    function virtualInvest(uint256 amount) override external returns (uint256) {
-        _virtualSharesInvestmentStartTime = block.timestamp;
-        return amount;
-    }
 }
+

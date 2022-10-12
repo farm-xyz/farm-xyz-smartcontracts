@@ -6,15 +6,19 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20Metadat
 
 interface IXAsset {
 
+    function getBaseToken() external view returns (IERC20Metadata);
+
     /**
      * @dev Invest an amount of X-BASE-TOKEN in different assets.
      */
-    function invest(IERC20Metadata token, uint256 amount) external;
+    function invest(IERC20Metadata token, uint256 amount)
+        external
+        returns (uint256);
 
     /**
      * @dev Withdraws a number of shares from the XASSET
      */
-    function withdraw(uint256 amount) external;
+    function withdraw(uint256 amount) external returns (uint256);
 
     /**
      * @param amount - The amount of shares to calculate the value of
@@ -35,12 +39,18 @@ interface IXAsset {
     /**
      * @return Total shares owned by address in this xAsset
      */
-    function getTotalSharesOwnedBy(address account) external view returns (uint256);
+    function getTotalSharesOwnedBy(address account)
+        external
+        view
+        returns (uint256);
 
     /**
      * @return Total value invested by address in this xAsset, in baseToken
      */
-    function getTotalValueOwnedBy(address account) external view returns (uint256);
+    function getTotalValueOwnedBy(address account)
+        external
+        view
+        returns (uint256);
 
     /**
      * @return The token that keeps track of the shares of this XASSET

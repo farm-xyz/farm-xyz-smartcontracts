@@ -9,6 +9,9 @@ import "@nomiclabs/hardhat-web3";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+import 'hardhat-preprocessor';
+import {ethers} from "ethers";
+import {removeConsoleLog} from "hardhat-preprocessor";
 
 dotenv.config();
 
@@ -33,17 +36,36 @@ const { ETH_MAINNET_RPC_PROVIDER,
         POLYGON_MUMBAI_RPC_PROVIDER,
         POLYGON_RPC_PROVIDER,
         POLYGON_PRIVATE_KEY,
-        POLYGONSCAN_API_KEY } = process.env;
+        POLYGONSCAN_API_KEY,
+        TEST_ACCOUNT2_PRIVATE_KEY,
+        TEST_ACCOUNT3_PRIVATE_KEY } = process.env;
 
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.4",
+  solidity: {
+    version: "0.8.4",
+    settings: { optimizer: { enabled: true, runs: 200, details: { yul: false }, }, }
+  },
   networks: {
     hardhat: {
-      // forking: {
-      //   url: POLYGON_RPC_PROVIDER as string,
-      //   blockNumber: 32126601
-      // }
+      forking: {
+        url: POLYGON_RPC_PROVIDER as string,
+        blockNumber: 33569661
+      },
+      accounts: [
+        {
+          privateKey: POLYGON_PRIVATE_KEY as string,
+          balance: ethers.utils.parseEther("10000000").toString(),
+        },
+        {
+          privateKey: TEST_ACCOUNT2_PRIVATE_KEY as string,
+          balance: ethers.utils.parseEther("10000000").toString(),
+        },
+        {
+          privateKey: TEST_ACCOUNT3_PRIVATE_KEY as string,
+          balance: ethers.utils.parseEther("10000000").toString(),
+        }
+      ]
     },
     ropsten: {
       url: ETH_ROPSTEN_RPC_PROVIDER,
@@ -61,6 +83,14 @@ const config: HardhatUserConfig = {
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
+    token: "MATIC",
+    gasPriceApi: "https://api.polygonscan.com/api?module=proxy&action=eth_gasPrice",
+    // proxyResolver: function() {
+    //   console.log('proxyResolver', arguments);
+    //   // @ts-ignore
+    //   return this.resolveByMethodSignature.apply(this, arguments);
+    //   // return new ethers.providers.Web3Provider(provider).getSigner(proxy.address);
+    // }
   },
   etherscan: {
     apiKey: {
@@ -70,6 +100,9 @@ const config: HardhatUserConfig = {
     },
 
   },
+  // preprocess: {
+  //   eachLine: removeConsoleLog((hre) => hre.network.name !== 'hardhat' && hre.network.name !== 'localhost'),
+  // },
 };
 
 export default config;

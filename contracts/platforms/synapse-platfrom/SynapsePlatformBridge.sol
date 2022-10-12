@@ -6,10 +6,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
-import "./IXPlatformBridge.sol";
-import "../FarmXYZBase.sol";
+import "../../bridges/IXPlatformBridge.sol";
+import "../../farms/FarmXYZBase.sol";
 
-contract FarmXYZPlatformBridge is IXPlatformBridge, OwnableUpgradeable, UUPSUpgradeable {
+contract SynapsePlatformBridge is IXPlatformBridge, OwnableUpgradeable, UUPSUpgradeable {
 
     string public name;
 
@@ -17,7 +17,7 @@ contract FarmXYZPlatformBridge is IXPlatformBridge, OwnableUpgradeable, UUPSUpgr
      */
     function initialize() initializer external {
         __UUPSUpgradeable_init();
-        name = "FarmXYZPlatformBridge";
+        name = "SynapsePlatformBridge";
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
