@@ -4,6 +4,10 @@ import {BigNumber} from "ethers";
 import {ERC20, FarmFixedRiskWallet, XAssetBase} from "../../typechain";
 import hre = require("hardhat");
 
+function timeout(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
     const [ owner ] = await ethers.getSigners();
 
@@ -82,6 +86,7 @@ async function main() {
     await xassetMacros.deployed();
     console.log("XAssetMacros deployed to:", xassetMacros.address);
 
+    await timeout(10000);
 
     console.log("Verifying up XAssetMacros...");
     await hre.run("verify:verify", {

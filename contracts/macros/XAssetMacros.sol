@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@opengsn/contracts/src/ERC2771Recipient.sol";
 import "../xassets/IXAsset.sol";
+import "./IXAssetMacros.sol";
 
-contract XAssetMacros is Ownable {
+contract XAssetMacros is Ownable, IXAssetMacros {
 
     uint256 constant MAX_INT = 2 ** 256 - 1;
 
@@ -16,7 +17,7 @@ contract XAssetMacros is Ownable {
         address token,
         uint256 amount
     //        int slippage
-    ) external returns (uint256) {
+    ) override external returns (uint256) {
         if (IERC20(token).allowance(_msgSender(), address(this)) < amount) {
             IERC20(token).approve(address(this), MAX_INT);
         }
@@ -30,8 +31,7 @@ contract XAssetMacros is Ownable {
     function withdrawFromXAsset(
         address xAsset,
         uint256 shares
-    ) external returns (uint256) {
-
+    ) override external returns (uint256) {
         uint256 baseTokenAmount = IXAsset(xAsset).withdraw(shares);
         require(IXAsset(xAsset).getBaseToken().transfer(msg.sender, baseTokenAmount), "ERC20: transfer failed");
         return baseTokenAmount;
