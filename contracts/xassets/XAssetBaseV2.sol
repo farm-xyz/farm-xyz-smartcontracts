@@ -22,7 +22,11 @@ import "../farms/FarmXYZBase.sol";
 // todo #6: share value conversion in x-base-token
 // zapper - conversie automata
 
-contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgradeable
+contract XAssetBaseV2 is
+    IXAsset,
+    OwnableUpgradeable,
+    ERC2771Recipient,
+    UUPSUpgradeable
 {
     uint256 constant MAX_UINT256 = 2 ** 256 - 1;
     /**
@@ -91,9 +95,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
 
         _name = name;
         _baseToken = baseToken;
-        _baseTokenDenominator = 10 ** _baseToken.decimals();
+        _baseTokenDenominator = 10**_baseToken.decimals();
         _shareToken = shareToken;
-        _shareTokenDenominator = 10 ** _shareToken.decimals();
+        _shareTokenDenominator = 10**_shareToken.decimals();
         _strategyIsInitialized = false;
         _initialInvestmentDone = false;
         _acceptedPriceDifference = 1000;
@@ -101,12 +105,12 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function setTrustedForwarder(address forwarder) public onlyOwner {
-        _setTrustedForwarder(forwarder);
+    function setTrustedForwarder(address _forwarder) public onlyOwner {
+        _setTrustedForwarder(_forwarder);
     }
 
-    function setAcceptedPriceDifference(uint256 priceDifference) public onlyOwner {
-        _acceptedPriceDifference = priceDifference;
+    function setAcceptedPriceDifference(uint256 _priceDifference) public onlyOwner {
+        _acceptedPriceDifference = _priceDifference;
     }
 
     /**
@@ -158,9 +162,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
     }
 
     function _checkPriceDifference(uint256 priceBefore, uint256 priceAfter)
-    internal
-    view
-    returns (uint256)
+        internal
+        view
+        returns (uint256)
     {
         if (priceBefore > priceAfter) {
             require(
@@ -178,11 +182,11 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
     }
 
     function invest(IERC20Metadata token, uint256 amount)
-    external
-    override
-    returns (uint256)
+        external
+        override
+        returns (uint256)
     {
-//        console.log("[xasset][invest] token: %s, amount: %s", token.symbol(), amount);
+        console.log("[xasset][invest] token: %s, amount: %s", token.symbol(), amount);
         require(_shareToken.totalSupply() > 0, "Initial investment is not done yet");
 
         require(token.transferFrom(_msgSender(), address(this), amount), "ERC20: transfer failed");
@@ -194,21 +198,21 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
 
         _strategy.compound();
         uint256 totalAssetValueBeforeInvest = _strategy.getTotalAssetValue();
-//        console.log("[xasset][invest] totalAssetValueBeforeInvest: %s", totalAssetValueBeforeInvest);
+        console.log("[xasset][invest] totalAssetValueBeforeInvest: %s", totalAssetValueBeforeInvest);
         uint256 pricePerShareBeforeInvest = this.getSharePrice();
         _strategy.invest(token, amount, amount, 50);
 
         uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
         uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
-//        console.log("[xasset][invest] totalAssetValueAfterInvest: %s", totalAssetValueAfterInvest);
+        console.log("[xasset][invest] totalAssetValueAfterInvest: %s", totalAssetValueAfterInvest);
 
         newShares =
-        (totalAssetValueInvested * _shareTokenDenominator) /
-        pricePerShareBeforeInvest;
+            (totalAssetValueInvested * _shareTokenDenominator) /
+            pricePerShareBeforeInvest;
         _shareToken.mint(_msgSender(), newShares);
         uint256 pricePerShareAfterInvest = this.getSharePrice();
-//        console.log("[xasset][invest] pricePerShareBeforeInvest", pricePerShareBeforeInvest);
-//        console.log("[xasset][invest] pricePerShareAfterInvest", pricePerShareAfterInvest);
+        console.log("[xasset][invest] pricePerShareBeforeInvest", pricePerShareBeforeInvest);
+        console.log("[xasset][invest] pricePerShareAfterInvest", pricePerShareAfterInvest);
         _checkPriceDifference(
             pricePerShareBeforeInvest,
             pricePerShareAfterInvest
@@ -225,7 +229,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
         uint256 pricePerShare = this.getSharePrice();
         uint256 baseTokenAmount = _strategy.convert(token, amount);
         uint256 shares = (baseTokenAmount * _shareTokenDenominator) /
-        pricePerShare;
+            pricePerShare;
         return shares;
     }
 
@@ -235,11 +239,10 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
             "You don't own enough shares"
         );
         uint256 totalAssetValueBeforeWithdraw = _strategy.getTotalAssetValue();
-//        console.log("[xasset][withdraw] totalAssetValueBeforeWithdraw: %s", totalAssetValueBeforeWithdraw);
-        uint256 pricePerShareBeforeWithdraw = this.getSharePrice();
-//        console.log("[xasset][withdraw] pricePerShareBeforeWithdraw: %s", pricePerShareBeforeWithdraw);
-        uint256 amountToWithdraw = (shares * pricePerShareBeforeWithdraw) / _shareTokenDenominator;
-//        console.log("[xasset][withdraw] amountToWithdraw: %s", amountToWithdraw);
+        uint256 pricePerShareBeforeWithdraw = (totalAssetValueBeforeWithdraw *
+            _shareTokenDenominator) / _shareToken.totalSupply();
+        uint256 amountToWithdraw = (shares * pricePerShareBeforeWithdraw) /
+            _shareTokenDenominator;
 
         uint256 withdrawn = _strategy.withdraw(
             amountToWithdraw,
@@ -255,7 +258,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
 
         uint256 totalAssetValueAfterWithdraw = _strategy.getTotalAssetValue();
         uint256 pricePerShareAfterWithdraw = (totalAssetValueAfterWithdraw *
-        _shareTokenDenominator) / _shareToken.totalSupply();
+            _shareTokenDenominator) / _shareToken.totalSupply();
         uint256 diff = _checkPriceDifference(
             pricePerShareBeforeWithdraw,
             pricePerShareAfterWithdraw
@@ -274,10 +277,10 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
      * @return The value of amount shares in baseToken
      */
     function getValueForShares(uint256 amount)
-    external
-    view
-    override
-    returns (uint256)
+        external
+        view
+        override
+        returns (uint256)
     {
         return this.getSharePrice() * amount;
     }
@@ -293,10 +296,10 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
      * @return Total shares owned by address in this xAsset
      */
     function getTotalSharesOwnedBy(address account)
-    external
-    view
-    override
-    returns (uint256)
+        external
+        view
+        override
+        returns (uint256)
     {
         return _shareToken.balanceOf(account);
     }
@@ -305,52 +308,52 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
      * @return Total value invested by address in this xAsset, in baseToken
      */
     function getTotalValueOwnedBy(address account)
-    external
-    view
-    override
-    returns (uint256)
+        external
+        view
+        override
+        returns (uint256)
     {
         uint256 sharePrice = this.getSharePrice();
         uint256 accountShares = this.getTotalSharesOwnedBy(account);
         uint256 totalValue = (accountShares * sharePrice) /
-        _shareTokenDenominator;
+            _shareTokenDenominator;
         return totalValue;
     }
 
     function shareToken()
-    external
-    view
-    override
-    returns (IERC20MetadataUpgradeable)
+        external
+        view
+        override
+        returns (IERC20MetadataUpgradeable)
     {
         return _shareToken;
     }
 
     function _msgSender()
-    internal
-    view
-    virtual
-    override(ERC2771Recipient, ContextUpgradeable)
-    returns (address ret)
+        internal
+        view
+        virtual
+        override(ERC2771Recipient, ContextUpgradeable)
+        returns (address ret)
     {
         return ERC2771Recipient._msgSender();
     }
 
     function _msgData()
-    internal
-    view
-    virtual
-    override(ERC2771Recipient, ContextUpgradeable)
-    returns (bytes calldata ret)
+        internal
+        view
+        virtual
+        override(ERC2771Recipient, ContextUpgradeable)
+        returns (bytes calldata ret)
     {
         return ERC2771Recipient._msgData();
     }
 
-    //    function logTokenValue(string memory message, uint256 amount) internal view {
-    //        log.value(message, amount, _baseTokenDenominator);
-    //    }
-    //
-    //    function logShareValue(string memory message, uint256 amount) internal view {
-    //        log.value(message, amount, _shareTokenDenominator);
-    //    }
+//    function logTokenValue(string memory message, uint256 amount) internal view {
+//        log.value(message, amount, _baseTokenDenominator);
+//    }
+//
+//    function logShareValue(string memory message, uint256 amount) internal view {
+//        log.value(message, amount, _shareTokenDenominator);
+//    }
 }

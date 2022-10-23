@@ -12,6 +12,16 @@ contract XAssetMacros is Ownable, IXAssetMacros {
 
     uint256 constant MAX_INT = 2 ** 256 - 1;
 
+    function macroTest(
+        address xAsset,
+        address token,
+        uint256 amount
+    //        int slippage
+    ) external returns (uint256) {
+        return 1;
+    }
+
+
     function investIntoXAsset(
         address xAsset,
         address token,

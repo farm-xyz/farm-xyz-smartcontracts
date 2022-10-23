@@ -31,7 +31,6 @@ contract XAssetShareToken is ERC20PermitUpgradeable, OwnableUpgradeable, UUPSUpg
         _mint(to, amount);
     }
 
-    // notes @Florin: modifier `public` sau `internal` ?
     function burn(address from, uint256 amount) public onlyXAsset {
         _burn(from, amount);
     }

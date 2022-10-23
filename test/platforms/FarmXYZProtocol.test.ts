@@ -1,25 +1,31 @@
 import {
     ERC20,
     FarmFixedRiskWallet,
-    FarmXYZBase,
     FarmXYZPlatformBridge,
     FarmXYZStrategy,
     XAssetBase,
-    XAssetMacros
+    XAssetMacros,
+    XAssetShareToken
 } from "../../typechain";
 import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
-import {ethers, network, upgrades, web3} from "hardhat";
+import {ethers, upgrades, web3} from "hardhat";
 import {expect} from "chai";
 import {BigNumber} from "ethers";
-import {mine} from "@nomicfoundation/hardhat-network-helpers";
-import {getPRBProxy, getPRBProxyRegistry, PRBProxy, PRBProxyRegistry} from "@prb/proxy";
+import {mine, time} from "@nomicfoundation/hardhat-network-helpers";
+import {getPRBProxyRegistry, PRBProxy, PRBProxyRegistry} from "@prb/proxy";
 import {executeViaProxy} from "../helpers/proxy";
-import {setTokenBalance} from "../helpers/chain";
-import {parseUnits} from "ethers/lib/utils";
 import "hardhat-gas-reporter"
-import {getProxyForSigner, initializeBaseWalletsAndTokens, usdc} from "../helpers/helpers";
+import {getProxyForSigner, initializeBaseWalletsAndTokens, setBaseWalletsAndTokens, usdc} from "../helpers/helpers";
+import fs, {readFileSync} from "fs";
+import {parseUnits} from "ethers/lib/utils";
+import {timeout} from "../helpers/utils";
+import hre = require("hardhat");
+
 
 describe.only("FarmXYZProtocol XAssets", async () => {
+
+    const forceRedeploy = true;
+
     let totalRewardPool: BigNumber;
 
     let xAsset: XAssetBase;
@@ -37,8 +43,17 @@ describe.only("FarmXYZProtocol XAssets", async () => {
 
     let xassetMacros: XAssetMacros;
 
+    async function macroTest(from: SignerWithAddress, amount:BigNumber) {
+        let proxy = await getProxyForSigner(from);
+        console.log('Invest via proxy: ', proxy.address);
+        const transaction = await executeViaProxy(proxy, from, xassetMacros, 'macroTest', [xAsset.address, usdcToken.address, amount]);
+        expect(transaction).to.not.be.revertedWith('ERC20: transfer amount exceeds balance');
+        console.log("Sent tx hash: ", transaction.hash);
+    }
+
     async function invest(from: SignerWithAddress, amount:BigNumber) {
         let proxy = await getProxyForSigner(from);
+        console.log('Invest via proxy: ', proxy.address);
         expect(await executeViaProxy(proxy, from, xassetMacros, 'investIntoXAsset', [xAsset.address, usdcToken.address, amount])).to.not.be.revertedWith('ERC20: transfer amount exceeds balance');
     }
 
@@ -47,7 +62,60 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         expect(await executeViaProxy(proxy, from, xassetMacros, 'withdrawFromXAsset', [xAsset.address, shares])).to.not.be.reverted;
     }
 
+    let config: { [key: string]: any } = {};
+
+    function readConfig() {
+        try {
+            let configJson = readFileSync('config.json', 'utf-8');
+            config = JSON.parse(configJson);
+        } catch (e) {
+            config = {};
+        }
+    }
+
+    function saveConfig() {
+        if (hre.network.name=== 'hardhat') return;
+        let configJson = JSON.stringify(config);
+        fs.writeFileSync('config.json', configJson);
+    }
+
+    async function initializeAndConnectToExistingContracts()
+    {
+        [owner, john, alice] = await ethers.getSigners();
+        const ERC20Factory = await ethers.getContractFactory("ERC20");
+        usdcToken = await ERC20Factory.attach('0x85111aF7Af9d768D928d8E0f893E793625C00bd1');
+        usdcTokenDecimals = 18; //baseWalletsAndTokens.usdcTokenDecimals;
+        const registry: PRBProxyRegistry = getPRBProxyRegistry(owner);
+
+        setBaseWalletsAndTokens({usdcToken, usdcTokenDecimals, registry, owner, john, alice});
+
+        ownerProxy = await getProxyForSigner(owner);
+
+        totalRewardPool = usdc("1000000");
+        const returnsPaybackPeriod = BigNumber.from(365*2*24*3600);
+
+        // Then let's initialize the reward farm
+
+        // Now let's initialize the XAsset
+        const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
+        const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
+        const XAssetBase = await ethers.getContractFactory("XAssetBase");
+        const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
+        const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
+
+        const xassetProxy = await XAssetBase.attach("0x0416fD0A193b5a0BE3d26e733039A85c21B58637") as XAssetBase;
+        xassetMacros = await XAssetMacros.attach("0xEcB8Fd8a34FF859745a0F0fFd5048e195C6F1DAb") as XAssetMacros;
+        shareToken = await XAssetShareToken.attach(await xassetProxy.shareToken()) as XAssetShareToken;
+
+        await Promise.all([
+            xassetProxy.deployed(),
+        ]);
+
+        xAsset = xassetProxy as XAssetBase;
+    }
+
     async function initialize() {
+        readConfig();
         let baseWalletsAndTokens = await initializeBaseWalletsAndTokens();
         usdcToken = baseWalletsAndTokens.usdcToken;
         usdcTokenDecimals = baseWalletsAndTokens.usdcTokenDecimals;
@@ -60,50 +128,136 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         totalRewardPool = usdc("1000000");
         const returnsPaybackPeriod = BigNumber.from(365*2*24*3600);
 
-        // Then let's initialize the reward farm
-
         const FarmFixedRiskWallet = await ethers.getContractFactory("FarmFixedRiskWallet");
-        const farmXYZFarmProxy = await upgrades.deployProxy(FarmFixedRiskWallet,
-            [usdcToken.address],
-            {kind: "uups"});
-        const farmXYZFarm = farmXYZFarmProxy as FarmFixedRiskWallet;
-        await farmXYZFarm.deployed();
-
-        await usdcToken.approve(farmXYZFarm.address, totalRewardPool);
-        await farmXYZFarm.depositToReturnsPool(totalRewardPool);
-        await farmXYZFarm.setPaybackPeriod(returnsPaybackPeriod);
-
-        // Now let's initialize the XAsset
         const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
         const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
         const XAssetBase = await ethers.getContractFactory("XAssetBase");
+        const XAssetBaseV2 = await ethers.getContractFactory("XAssetBaseV2");
         const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
+        const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
 
-        const bridge = await upgrades.deployProxy(FarmXYZPlatformBridge, [], {kind: "uups"});
-        await bridge.deployed();
+        let farmXYZFarm;
 
-        const strategy = await upgrades.deployProxy(FarmXYZStrategy,
-            [bridge.address, farmXYZFarm.address, usdcToken.address],
-            {kind: "uups"});
+        // Then let's initialize the reward farm
+        if (!forceRedeploy && config['FarmFixedRiskWallet']) {
+            farmXYZFarm = FarmFixedRiskWallet.attach(config['FarmFixedRiskWallet']) as FarmFixedRiskWallet;
+        } else {
+            const farmXYZFarmProxy = await upgrades.deployProxy(FarmFixedRiskWallet,
+                [usdcToken.address],
+                {kind: "uups"});
+            farmXYZFarm = farmXYZFarmProxy as FarmFixedRiskWallet;
+            await farmXYZFarm.deployed();
+            config['FarmFixedRiskWallet'] = farmXYZFarm.address;
+            saveConfig();
+            console.log("FarmFixedRiskWallet deployed to:", farmXYZFarm.address);
+        }
 
-        const _shareToken = await upgrades.deployProxy(XAssetShareToken,
-            ["X-DAI/USDC/USDT XASSET", "X-DAI-USDC-USDT"],
-            {kind: "uups"});
-        await _shareToken.deployed();
+        if (forceRedeploy || !config['FarmFixedRiskWalletInitialised']) {
+            await usdcToken.approve(farmXYZFarm.address, totalRewardPool);
+            await farmXYZFarm.depositToReturnsPool(totalRewardPool);
+            await farmXYZFarm.setPaybackPeriod(returnsPaybackPeriod);
+            await farmXYZFarm.setWhitelistEnabled(true);
+            config['FarmFixedRiskWalletInitialised'] = true;
+            saveConfig();
+        }
+
+        console.log("FarmFixedRiskWallet configured");
+
+        let bridge;
+        if (forceRedeploy || !config['FarmXYZPlatformBridge']) {
+            bridge = await upgrades.deployProxy(FarmXYZPlatformBridge, [], {kind: "uups"});
+            await bridge.deployed();
+            config['FarmXYZPlatformBridge'] = bridge.address;
+            saveConfig();
+            console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
+        } else {
+            bridge = FarmXYZPlatformBridge.attach(config['FarmXYZPlatformBridge']) as FarmXYZPlatformBridge;
+        }
+
+        let strategy;
+
+        if (forceRedeploy || !config['FarmXYZStrategy']) {
+            strategy = await upgrades.deployProxy(FarmXYZStrategy,
+                [bridge.address, farmXYZFarm.address, usdcToken.address],
+                {kind: "uups"});
+            await strategy.deployed();
+            config['FarmXYZStrategy'] = strategy.address;
+            await farmXYZFarm.addToWhitelist([ strategy.address ]);
+            saveConfig();
+            console.log("FarmXYZStrategy deployed to:", strategy.address);
+        } else {
+            strategy = FarmXYZStrategy.attach(config['FarmXYZStrategy']) as FarmXYZStrategy;
+        }
+
+        let _shareToken;
+        if (forceRedeploy || !config['XAssetShareToken']) {
+            _shareToken = await upgrades.deployProxy(XAssetShareToken,
+                ["X-DAI/USDC/USDT XASSET", "X-DAI-USDC-USDT"],
+                {kind: "uups"});
+            await _shareToken.deployed();
+            config['XAssetShareToken'] = _shareToken.address;
+            saveConfig();
+            console.log("XAssetShareToken deployed to:", _shareToken.address);
+        } else {
+            _shareToken = XAssetShareToken.attach(config['XAssetShareToken']) as XAssetShareToken;
+        }
+
+
         shareToken = _shareToken as ERC20;
 
-        const xassetProxy = await upgrades.deployProxy(XAssetBase,
-            ["X-DAI-USDC-USDT", usdcToken.address, _shareToken.address],
-            {kind: "uups"});
-        await xassetProxy.deployed();
-        await _shareToken.setXAsset(xassetProxy.address);
-        await (xassetProxy as XAssetBase).setStrategy(strategy.address);
-        await usdcToken.transfer(xassetProxy.address, usdc("10"));
-        await (xassetProxy as XAssetBase).executeInitialInvestment();
+        let xassetProxy;
+        if (forceRedeploy || !config['XAssetBase']) {
+            xassetProxy = await upgrades.deployProxy(XAssetBase,
+                ["X-DAI-USDC-USDT", usdcToken.address, _shareToken.address],
+                {kind: "uups"});
+            await xassetProxy.deployed();
+            config['XAssetBase'] = xassetProxy.address;
+            saveConfig();
+            console.log("XAssetBase deployed to:", xassetProxy.address);
+        } else {
+            xassetProxy = XAssetBase.attach(config['XAssetBase']) as XAssetBase;
+
+            if (config['upgrade'] && config['upgrade']['XAssetBase']) {
+                console.log("Upgrading XAssetBase contract at", xassetProxy.address);
+                const oldContract = await upgrades.forceImport(config['XAssetBase'], XAssetBase, { kind: "uups" });
+                xassetProxy = await upgrades.upgradeProxy(xassetProxy.address, XAssetBaseV2, {kind: "uups"});
+            }
+
+        }
+
+        if (forceRedeploy || !config['XAssetBaseInitialised']) {
+            await _shareToken.setXAsset(xassetProxy.address);
+            await (xassetProxy as XAssetBase).setStrategy(strategy.address);
+            await usdcToken.transfer(xassetProxy.address, usdc("10"));
+            await (xassetProxy as XAssetBase).executeInitialInvestment();
+            config['XAssetBaseInitialised'] = true;
+            saveConfig();
+        }
+
+        console.log("XAssetBase configured");
 
         // Now that all those are done let's initialize the macros contract
-        const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
-        xassetMacros = await XAssetMacros.deploy();
+        if (!forceRedeploy && config['XAssetMacros']) {
+            xassetMacros = XAssetMacros.attach(config['XAssetMacros']) as XAssetMacros;
+        } else {
+            xassetMacros = await XAssetMacros.deploy();
+            config['XAssetMacros'] = xassetMacros.address;
+            saveConfig();
+            console.log("XAssetMacros deployed to:", xassetMacros.address);
+        }
+
+        if ((await usdcToken.allowance(owner.address, ownerProxy.address)).lte(parseUnits("100000", usdcTokenDecimals))) {
+            console.log("Approving ownerProxy to spend USDC");
+            await usdcToken.approve(ownerProxy.address, parseUnits("100000", usdcTokenDecimals));
+        }
+        if ((await usdcToken.balanceOf(john.address)).lte(parseUnits("10000", usdcTokenDecimals))) {
+            console.log("Transferring USDC to John");
+            await usdcToken.transfer(john.address, parseUnits("10000", usdcTokenDecimals));
+        }
+        if ((await usdcToken.balanceOf(alice.address)).lte(parseUnits("10000", usdcTokenDecimals))) {
+            console.log("Transferring USDC to Alice");
+            await usdcToken.transfer(alice.address, parseUnits("10000", usdcTokenDecimals));
+        }
 
         await Promise.all([
             bridge.deployed(),
@@ -117,6 +271,7 @@ describe.only("FarmXYZProtocol XAssets", async () => {
     beforeEach(async () => {
         // Let's set up the XASSET contracts
         await initialize();
+        // await initializeAndConnectToExistingContracts();
     })
 
     describe('Setup', () => {
@@ -126,12 +281,21 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         })
     });
 
+    describe('Test Macros Contract via proxy', () => {
+        it('should be able to call a function via proxy', async () => {
+
+            await macroTest(owner, usdc("10"));
+
+        })
+    });
+
+
     describe('Invest', () => {
 
         it('should allow users to invest a specific token amount', async () => {
 
             const sharesBefore = await shareToken.totalSupply();
-            await invest(john, usdc("10"));
+            await invest(owner, usdc("10"));
             const sharesAfter = await shareToken.totalSupply();
 
             expect(sharesAfter).to.greaterThan(sharesBefore);
@@ -254,6 +418,50 @@ describe.only("FarmXYZProtocol XAssets", async () => {
             const amount = usdc("100");
             await invest(john, amount);
 
+            await time.increase(15*25*3600);
+
+            const johnProxy = await getProxyForSigner(john);
+            const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(johnProxy.address);
+            let ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
+            console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
+            const halfOwnedShares = ownedShares.div(BigNumber.from(2));
+
+            // withdraw half of the shares
+            await withdraw(john, halfOwnedShares);
+            // TODO: check balances!!!!
+
+            ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
+            console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
+
+            expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
+
+        })
+
+        it('should allow multiple users to invest and withdraw at anytime', async () => {
+            // invest 100 tokens
+            const amount = usdc("100");
+            await invest(john, amount);
+
+            await time.increase(24*3600);
+
+            await invest(alice, amount);
+
+            await time.increase(24*3600);
+
+            await invest(john, amount);
+
+            await time.increase(24*3600);
+
+            await withdraw(alice, await xAsset.getTotalSharesOwnedBy(alice.address));
+
+            await time.increase(24*3600);
+
+            await invest(alice, amount);
+
+            await time.increase(15*25*3600);
+
+            await invest(owner, amount);
+
             const johnProxy = await getProxyForSigner(john);
             const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(johnProxy.address);
             let ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
@@ -298,4 +506,4 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         })
 
     });
-});
+}).timeout(1000000000);

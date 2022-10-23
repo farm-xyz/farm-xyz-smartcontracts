@@ -24,8 +24,6 @@ contract FarmXYZStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
 
     uint256 private _baseTokenDenominator;
 
-    uint256 private _totalValueLocked;
-
     /**
      * @param bridge - The strategy used to manage actions between investment assets
      * @param farm - The farm used for investing
@@ -52,14 +50,12 @@ contract FarmXYZStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable {
             _baseToken.approve(address(_farm), amount);
         }
         _farm.stake(amount);
-        _totalValueLocked += amount;
         return amount;
     }
 
     function withdraw(uint256 amount, IERC20Metadata toToken, int slippage) override external returns (uint256) {
         _farm.unstake(amount);
         require(_baseToken.transfer(msg.sender, amount), "ERC20: transfer failed");
-        _totalValueLocked -= amount;
         return amount;
     }
 

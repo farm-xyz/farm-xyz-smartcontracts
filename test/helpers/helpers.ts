@@ -16,6 +16,7 @@ import {parseUnits} from "ethers/lib/utils";
 import {getPRBProxy, getPRBProxyRegistry, PRBProxyRegistry} from "@prb/proxy";
 import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
 import {PRBProxy} from "@prb/proxy/dist/types/PRBProxy";
+import hre = require("hardhat");
 
 type BaseWalletsAndTokens = {
   usdcToken: ERC20,
@@ -35,18 +36,39 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
   [owner, john, alice] = await ethers.getSigners();
 
   const ERC20Factory = await ethers.getContractFactory("ERC20");
-  let usdcToken = ERC20Factory.attach("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
-  let usdcTokenDecimals = await usdcToken.decimals();
 
-  await setTokenBalance("USDC", owner.address, parseUnits("102000000", usdcTokenDecimals));
-  await usdcToken.connect(owner).transfer(john.address,  parseUnits("1000000", usdcTokenDecimals));
-  await usdcToken.connect(owner).transfer(alice.address, parseUnits("1000000", usdcTokenDecimals));
+  let usdcToken:ERC20;
+  let usdcTokenDecimals = 18;
+  if (hre.network.name === "hardhat") {
+    usdcToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
+    usdcTokenDecimals = await usdcToken.decimals();
+
+    /*
+    usdcToken = ERC20Factory.attach("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+    usdcTokenDecimals = await usdcToken.decimals();
+    await setTokenBalance("USDC", owner.address, parseUnits("102000000", usdcTokenDecimals));
+    await usdcToken.connect(owner).transfer(john.address,  parseUnits("1000000", usdcTokenDecimals));
+    await usdcToken.connect(owner).transfer(alice.address, parseUnits("1000000", usdcTokenDecimals));
+     */
+  } else if (hre.network.name == "mumbai") {
+    usdcToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
+    usdcTokenDecimals = await usdcToken.decimals();
+    // await usdcToken.connect(owner).(owner.address, parseUnits("102000000", 6));
+  } else {
+    const TestTokenFactory = await ethers.getContractFactory("TestToken");
+    usdcToken = await TestTokenFactory.deploy("Test USDC", "USDC") as ERC20;
+  }
+
 
   // Start with PRBProxy initialization
   const registry: PRBProxyRegistry = getPRBProxyRegistry(owner);
 
   baseWalletsAndTokens = {usdcToken, usdcTokenDecimals, registry, owner, john, alice};
   return baseWalletsAndTokens;
+}
+
+export function setBaseWalletsAndTokens(bw: BaseWalletsAndTokens) {
+    baseWalletsAndTokens = bw;
 }
 
 export function usdc(amount:string) {

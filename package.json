@@ -6,8 +6,11 @@
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^4.7.3",
     "@prb/proxy": "^2.0.0",
+    "axios": "^1.1.2",
+    "firebase-admin": "^11.2.0",
     "hardhat": "^2.8.0",
-    "hardhat-preprocessor": "^0.1.5"
+    "hardhat-preprocessor": "^0.1.5",
+    "moment": "^2.29.4"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
@@ -49,7 +52,8 @@
   },
   "scripts": {
     "test": "npx hardhat test",
-    "compile": "npx hardhat compile"
+    "compile": "npx hardhat compile",
+    "monitor": "npx hardhat run --network mumbai scripts/xassets/monitor-xassets.ts"
   },
   "author": "",
   "license": "ISC",

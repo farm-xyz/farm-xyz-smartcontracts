@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./IFarmXYZPool.sol";
+//import "hardhat/console.sol";
+//import "../../utils/log.sol";
 
 contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPool {
 
@@ -82,8 +84,12 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
         return _stakingBalance[user];
     }
 
-    function getUserBalance(address user) override external view returns (uint256) {
+    function _getUserBalance(address user) private view returns (uint256) {
         return _stakingBalance[user] + calculateYieldTotal(user);
+    }
+
+    function getUserBalance(address user) override external view returns (uint256) {
+        return _getUserBalance(user);
     }
 
     function depositToReturnsPool(uint256 amount) public {
@@ -104,7 +110,7 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
         require(!_isWhitelistOnly || _whitelist[msg.sender], "You are not whitelisted");
 
         if (_isStaking[msg.sender] == true) {
-            this.compoundYield();
+            _compoundYieldFor(msg.sender);
         }
 
         require(_token.transferFrom(msg.sender, address(this), amount), "ERC20: transferFrom failed");
@@ -118,25 +124,32 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
     function unstakeAll() public
     {
         require(_isStaking[msg.sender] == true, "Nothing to unstake");
-        this.unstake(_stakingBalance[msg.sender] + calculateYieldTotal(msg.sender));
+        _unstake(msg.sender, _getUserBalance(msg.sender));
+    }
+
+    function _unstake(address owner, uint256 amount) private {
+        require(_isStaking[owner] == true, "Nothing to unstake");
+
+        // Let's compoundYield first
+        _compoundYieldFor(owner);
+
+//        log.tokenValue("[unstake] balance after compound", address(_token), _stakingBalance[owner]);
+//        log.tokenValue("[unstake] unstake amount", address(_token), amount);
+
+        require(_stakingBalance[owner] >= amount, "Balance is lower than amount");
+        uint256 balTransfer = amount;
+        amount = 0;
+        _stakingBalance[owner] -= balTransfer;
+        _totalValueDeposited -= balTransfer;
+        require(_token.transfer(owner, balTransfer), "ERC20: transfer failed");
+        if (_stakingBalance[owner] == 0) {
+            _isStaking[owner] = false;
+        }
+        emit Unstake(owner, balTransfer);
     }
 
     function unstake(uint256 amount) override external {
-        require(_isStaking[msg.sender] == true, "Nothing to unstake");
-
-        // Let's compoundYield first
-        this.compoundYield();
-
-        require(_stakingBalance[msg.sender] >= amount, "Balance is lower than amount");
-        uint256 balTransfer = amount;
-        amount = 0;
-        _stakingBalance[msg.sender] -= balTransfer;
-        _totalValueDeposited -= balTransfer;
-        require(_token.transfer(msg.sender, balTransfer), "ERC20: transfer failed");
-        if (_stakingBalance[msg.sender] == 0) {
-            _isStaking[msg.sender] = false;
-        }
-        emit Unstake(msg.sender, balTransfer);
+        _unstake(msg.sender, amount);
     }
 
     function calculateRatePerSecond() internal view returns (uint256) {
@@ -166,24 +179,32 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
         return rawYield;
     }
 
-    function compoundYield() override external {
+    function _compoundYieldFor(address owner) private {
+//        console.log("[cY] Compounding yield for", owner);
         uint256 toTransfer = 0;
-        uint256 currentPeriodYield = calculateYieldTotal(msg.sender);
+        uint256 currentPeriodYield = calculateYieldTotal(owner);
 
         toTransfer += currentPeriodYield;
 
         if (toTransfer == 0) {
             return;
         }
-
-        _startTime[msg.sender] = block.timestamp;
+//        log.tokenValue("[cY] compounding", address(_token), toTransfer);
         require(_totalReturnsDeposited >= toTransfer, "There aren't enough returns deposited in the pool");
+        _startTime[msg.sender] = block.timestamp;
         _totalReturnsDeposited -= toTransfer;
 
         _stakingBalance[msg.sender] += toTransfer;
         _totalValueDeposited += toTransfer;
+//        log.tokenValue("[cY] new balance", address(_token), _stakingBalance[msg.sender]);
+//        log.tokenValue("[cY] _totalReturnsDeposited", address(_token), _totalReturnsDeposited);
+//        log.tokenValue("[cY] _totalValueDeposited", address(_token), _totalValueDeposited);
 
         emit YieldCompound(msg.sender, toTransfer);
+    }
+
+    function compoundYield() override external {
+        _compoundYieldFor(msg.sender);
     }
 
 }

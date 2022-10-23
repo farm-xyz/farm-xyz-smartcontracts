@@ -1,0 +1,1 @@
+GET https://farm-xyz-backend.master.d.com.ro/api/v1/xasset-price/8f417512-e890-4d15-9741-56edb11a226e/history?interval=1d&limit=20
