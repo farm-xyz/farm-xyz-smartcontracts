@@ -145,7 +145,7 @@ let FarmFixedRiskWalletFactory: FarmFixedRiskWallet__factory;
 let XAssetBaseFactory: XAssetBase__factory;
 let xAssetCollection: firestore.CollectionReference<XAsset>;
 let xAssetCharts: { [key: string]: { [key: string]: { [key: string]: any } } } = {};
-
+let batch: firestore.WriteBatch | null;
 
 async function initialize() {
     const serviceAccount = JSON.parse(readFileSync(".firebase-admin-key.json").toString());
@@ -179,12 +179,13 @@ async function getXAssetPriceHistory(xAsset: XAsset, interval: string, limit: nu
             }
         });
     let candles = chartResponse.data.data[interval];
-    updateXAssetFirebaseChartData(xAsset, interval, candles);
+    await updateXAssetFirebaseChartData(xAsset, interval, candles);
     return candles;
 }
 
 async function updateXAssetFirebaseChartData(xAsset: XAsset, interval: string, candles: any[]) {
-    let batch = db.batch();
+    if (!batch)
+        batch = db.batch();
     if (!xAssetCharts[xAsset.id]) {
         xAssetCharts[xAsset.id] = {};
     }
@@ -206,10 +207,9 @@ async function updateXAssetFirebaseChartData(xAsset: XAsset, interval: string, c
             shouldUpdate = true;
         if (shouldUpdate) {
             xAssetCharts[xAsset.id][interval][candle.t] = candle;
-            batch.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
+            batch?.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
         }
     }
-    batch.commit();
 }
 
 async function getFirebaseChartData() {
@@ -305,12 +305,19 @@ async function main() {
 
     await getFirebaseChartData();
 
+    if (batch) {
+        await batch.commit();
+        batch = null;
+    }
+
+
     // noinspection UnreachableCodeJS
     ethers.provider.on('block', async (blockNumber) => {
         console.log("New block: ", blockNumber);
         const blockInfo = await ethers.provider.getBlock(blockNumber);
         let time = moment.unix(blockInfo.timestamp).toISOString();
         console.log(blockInfo.timestamp, time);
+        batch = db.batch();
         for (const xAsset of xAssetList) {
             const name = xAsset.name;
             const price = await xAsset.contract?.getSharePrice();
@@ -322,11 +329,13 @@ async function main() {
             });
             let xAssetUpdate = XAsset.fromDbData(response.data.data.xAsset);
             xAssetUpdate.chart = await getXAssetPriceHistory(xAssetUpdate, '1d');
-            console.log(xAssetUpdate);
-            await xAssetCollection.doc(xAssetUpdate.id).set(xAssetUpdate);
+            // console.log(xAssetUpdate);
+            batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
             // console.log(response.data);
             // console.log(response.data.data.xAsset);
         }
+        await batch.commit();
+        batch = null;
     });
 }
 
