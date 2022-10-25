@@ -39,8 +39,8 @@ class XAsset {
     chain: string | undefined;
     price: string | undefined;
     isTestNet: boolean = false;
-    priceToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string } | undefined;
-    shareToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string } | undefined;
+    priceToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string, displayDecimals: number } | undefined;
+    shareToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string, displayDecimals: number } | undefined;
     chart: { t:any, o: string, h: string, l: string, c: string }[] | undefined;
 
     #contract: XAssetBase | undefined;
