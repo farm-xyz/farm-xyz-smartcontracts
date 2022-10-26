@@ -316,56 +316,60 @@ async function main() {
     // noinspection UnreachableCodeJS
     ethers.provider.on('block', async (blockNumber) => {
         console.log("New block: ", blockNumber);
-        const blockInfo = await ethers.provider.getBlock(blockNumber);
-        let time = moment.unix(blockInfo.timestamp).toISOString();
-        console.log(blockInfo.timestamp, time);
-        if (blockInfo.timestamp - lastProcessedBlockTime < 5) {
-            return;
-        }
-        lastProcessedBlockTime = blockInfo.timestamp;
-        let batch = db.batch();
-        if (blockInfo.timestamp - lastXAssetSyncTime > 60) {
-            await updateXAssetList(batch);
-            lastXAssetSyncTime = blockInfo.timestamp;
-        }
-        for (const xAsset of xAssetList) {
-            const name = xAsset.name;
-            const price = await xAsset.contract?.getSharePrice();
-            console.log("Price for xAsset ", name, " at block ", blockNumber, ": ", price?.toString());
-            let response = await axios.post(BASE_URL + '/api/v1/xasset-price', {
-                xAssetId: xAsset.id,
-                price: price?.toString(),
-                time: time
-            });
-            let xAssetUpdate = XAsset.fromDbData(response.data.data.xAsset);
-            let candlePromises = [];
-            let promise1dCandles:Promise<any> | null = null;
-            for (let interval of intervals) {
-                candlePromises.push(getXAssetPriceHistory(xAssetUpdate, interval, candleLimitPerInterval[interval]));
-                if (interval=='1d') {
-                    promise1dCandles = candlePromises[candlePromises.length-1];
-                }
+        try {
+            const blockInfo = await ethers.provider.getBlock(blockNumber);
+            let time = moment.unix(blockInfo.timestamp).toISOString();
+            console.log(blockInfo.timestamp, time);
+            if (blockInfo.timestamp - lastProcessedBlockTime < 5) {
+                return;
             }
-
-            candlePromises.push(promise1dCandles?.then(async candles => {
-                xAssetUpdate.chart = candles;
-                batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
-            }));
-            await Promise.all(candlePromises).then(async candles => {
-                for(let i = 0; i < intervals.length; i++) {
-                    console.log('Updating ', xAssetUpdate.id, ' ', intervals[i], ' candles');
-                    await updateXAssetFirebaseChartData(batch, xAsset, intervals[i], candles[i]);
+            lastProcessedBlockTime = blockInfo.timestamp;
+            let batch = db.batch();
+            if (blockInfo.timestamp - lastXAssetSyncTime > 60) {
+                await updateXAssetList(batch);
+                lastXAssetSyncTime = blockInfo.timestamp;
+            }
+            for (const xAsset of xAssetList) {
+                const name = xAsset.name;
+                const price = await xAsset.contract?.getSharePrice();
+                console.log("Price for xAsset ", name, " at block ", blockNumber, ": ", price?.toString());
+                let response = await axios.post(BASE_URL + '/api/v1/xasset-price', {
+                    xAssetId: xAsset.id,
+                    price: price?.toString(),
+                    time: time
+                });
+                let xAssetUpdate = XAsset.fromDbData(response.data.data.xAsset);
+                let candlePromises = [];
+                let promise1dCandles: Promise<any> | null = null;
+                for (let interval of intervals) {
+                    candlePromises.push(getXAssetPriceHistory(xAssetUpdate, interval, candleLimitPerInterval[interval]));
+                    if (interval == '1d') {
+                        promise1dCandles = candlePromises[candlePromises.length - 1];
+                    }
                 }
-            }).catch(e => {
-                console.error("Error getting xAsset price history: ", e);
-            });
 
-            // console.log(xAssetUpdate);
+                candlePromises.push(promise1dCandles?.then(async candles => {
+                    xAssetUpdate.chart = candles;
+                    batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
+                }));
+                await Promise.all(candlePromises).then(async candles => {
+                    for (let i = 0; i < intervals.length; i++) {
+                        console.log('Updating ', xAssetUpdate.id, ' ', intervals[i], ' candles');
+                        await updateXAssetFirebaseChartData(batch, xAsset, intervals[i], candles[i]);
+                    }
+                }).catch(e => {
+                    console.error("Error getting xAsset price history: ", e);
+                });
 
-            // console.log(response.data);
-            // console.log(response.data.data.xAsset);
+                // console.log(xAssetUpdate);
+
+                // console.log(response.data);
+                // console.log(response.data.data.xAsset);
+            }
+            await batch.commit();
+        } catch (e:any) {
+            console.error("Error processing block: ", e);
         }
-        await batch.commit();
     });
 }
 
