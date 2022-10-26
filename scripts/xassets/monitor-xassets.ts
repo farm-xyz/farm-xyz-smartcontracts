@@ -188,7 +188,7 @@ async function getXAssetPriceHistory(xAsset: XAsset, interval: string, limit: nu
     return chartResponse.data.data[interval];
 }
 
-async function updateXAssetFirebaseChartData(batch: WriteBatch, xAsset: XAsset, interval: string, candles: any[]) {
+function updateXAssetFirebaseChartData(batch: WriteBatch, xAsset: XAsset, interval: string, candles: any[]) {
     if (!xAssetCharts[xAsset.id]) {
         xAssetCharts[xAsset.id] = {};
     }
@@ -211,6 +211,7 @@ async function updateXAssetFirebaseChartData(batch: WriteBatch, xAsset: XAsset, 
         if (shouldUpdate) {
             xAssetCharts[xAsset.id][interval][candle.t] = candle;
             batch?.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
+            console.log("Updating chart data for ", xAsset.id, interval, candle.t);
         }
     }
 }
@@ -249,7 +250,7 @@ async function updateXAssetList(batch: WriteBatch) {
             let x = XAsset.fromDbData(xAssetData);
             let candles = await getXAssetPriceHistory(x, '1d');
             x.chart = candles;
-            await updateXAssetFirebaseChartData(batch, x, '1d', candles);
+            updateXAssetFirebaseChartData(batch, x, '1d', candles);
 
             xAssetListFromDb.push(x);
         }
@@ -272,6 +273,7 @@ async function updateXAssetList(batch: WriteBatch) {
                 break;
             }
         }
+        console.log("batch set ", x.id, " => ", x);
         batch.set(xAssetCollection.doc(x.id), x);
         xAssetListFromFirebase[idx] = x;
     }
@@ -291,6 +293,7 @@ async function updateXAssetList(batch: WriteBatch) {
     }
 
     xAssetList = xAssetListFromDb;
+    console.log("-- Merge done --");
 
 }
 
@@ -309,7 +312,9 @@ async function main() {
 
     let batch = db.batch();
     await updateXAssetList(batch);
-    await batch.commit();
+    console.log("Commit xAsset list");
+    //await batch.commit();
+    console.log("XAsset list updated");
 
     await getFirebaseChartData();
 
