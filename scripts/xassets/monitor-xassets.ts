@@ -15,6 +15,7 @@ import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
 import hre = require("hardhat");
 import FirestoreDataConverter = firestore.FirestoreDataConverter;
 import WriteBatch = firestore.WriteBatch;
+import setLogFunction = firestore.setLogFunction;
 
 const BASE_URL = 'https://farm-xyz-backend.master.d.com.ro';
 
@@ -120,8 +121,8 @@ const xAssetFirebaseConverter: FirestoreDataConverter<XAsset> = {
 
 const intervals=[ '1m', '5m', '1h', '1d', '1w' ];
 const candleLimitPerInterval:{ [key: string]: number } = {
-    '1m': 60*24,
-    '5m': 60*24/5,
+    '1m': 100, //60*24,
+    '5m': 100, //60*24/5,
     '1h': 24,
     '1d': 30,
     '1w': 52
@@ -157,10 +158,13 @@ let xAssetCharts: { [key: string]: { [key: string]: { [key: string]: any } } } =
 async function initialize() {
     const serviceAccount = JSON.parse(readFileSync(".firebase-admin-key.json").toString());
 
+    // setLogFunction(console.log);
+
     app = admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         databaseURL: "https://farm-xyz-d93ea-default-rtdb.firebaseio.com"
     });
+
 
     // Initialize Cloud Firestore and get a reference to the service
     db = app.firestore();
@@ -188,7 +192,7 @@ async function getXAssetPriceHistory(xAsset: XAsset, interval: string, limit: nu
     return chartResponse.data.data[interval];
 }
 
-function updateXAssetFirebaseChartData(batch: WriteBatch, xAsset: XAsset, interval: string, candles: any[]) {
+async function updateXAssetFirebaseChartData(batch: WriteBatch | null, xAsset: XAsset, interval: string, candles: any[]) {
     if (!xAssetCharts[xAsset.id]) {
         xAssetCharts[xAsset.id] = {};
     }
@@ -210,8 +214,12 @@ function updateXAssetFirebaseChartData(batch: WriteBatch, xAsset: XAsset, interv
             shouldUpdate = true;
         if (shouldUpdate) {
             xAssetCharts[xAsset.id][interval][candle.t] = candle;
-            batch?.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
             console.log("Updating chart data for ", xAsset.id, interval, candle.t);
+            if (batch) {
+                batch?.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
+            } else {
+                await db.collection('charts/' + xAsset.id + '/' + interval).doc(candle.t.toString()).set(candle);
+            }
         }
     }
 }
@@ -230,7 +238,7 @@ async function getFirebaseChartData() {
     }
 }
 
-async function updateXAssetList(batch: WriteBatch) {
+async function updateXAssetList(batch: WriteBatch | null) {
     let xAssetListFromFirebase: XAsset[] = [];
     let xAssetListFromDb: XAsset[] = [];
 
@@ -250,7 +258,7 @@ async function updateXAssetList(batch: WriteBatch) {
             let x = XAsset.fromDbData(xAssetData);
             let candles = await getXAssetPriceHistory(x, '1d');
             x.chart = candles;
-            updateXAssetFirebaseChartData(batch, x, '1d', candles);
+            await updateXAssetFirebaseChartData(batch, x, '1d', candles);
 
             xAssetListFromDb.push(x);
         }
@@ -274,7 +282,11 @@ async function updateXAssetList(batch: WriteBatch) {
             }
         }
         console.log("batch set ", x.id, " => ", x);
-        batch.set(xAssetCollection.doc(x.id), x);
+        if (batch) {
+            batch.set(xAssetCollection.doc(x.id), x);
+        } else {
+            await xAssetCollection.doc(x.id).set(x);
+        }
         xAssetListFromFirebase[idx] = x;
     }
 
@@ -288,7 +300,11 @@ async function updateXAssetList(batch: WriteBatch) {
         }
         if (!found) {
             console.log("Removing ", f.id);
-            batch.delete(xAssetCollection.doc(f.id));
+            if (batch) {
+                batch.delete(xAssetCollection.doc(f.id));
+            } else {
+                await xAssetCollection.doc(f.id).delete();
+            }
         }
     }
 
@@ -311,13 +327,17 @@ async function main() {
     // console.log("FarmFixedRiskWallet attached to:", farmXYZFarm.address);
 
     let batch = db.batch();
+    // let batch:WriteBatch|null = null;
     await updateXAssetList(batch);
     console.log("Commit xAsset list");
-    //await batch.commit();
+    if (batch) {
+        await batch?.commit();
+    }
     console.log("XAsset list updated");
 
     await getFirebaseChartData();
 
+    // return;
     // noinspection UnreachableCodeJS
     ethers.provider.on('block', async (blockNumber) => {
         console.log("New block: ", blockNumber);
@@ -330,6 +350,7 @@ async function main() {
             }
             lastProcessedBlockTime = blockInfo.timestamp;
             let batch = db.batch();
+            // let batch:WriteBatch|null = null;
             if (blockInfo.timestamp - lastXAssetSyncTime > 60) {
                 await updateXAssetList(batch);
                 lastXAssetSyncTime = blockInfo.timestamp;
@@ -355,7 +376,11 @@ async function main() {
 
                 candlePromises.push(promise1dCandles?.then(async candles => {
                     xAssetUpdate.chart = candles;
-                    batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
+                    if (batch) {
+                        batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
+                    } else {
+                        await xAssetCollection.doc(xAssetUpdate.id).set(xAssetUpdate);
+                    }
                 }));
                 await Promise.all(candlePromises).then(async candles => {
                     for (let i = 0; i < intervals.length; i++) {
@@ -371,7 +396,9 @@ async function main() {
                 // console.log(response.data);
                 // console.log(response.data.data.xAsset);
             }
-            await batch.commit();
+            if (batch)
+                await batch.commit();
+
         } catch (e:any) {
             console.error("Error processing block: ", e);
         }
