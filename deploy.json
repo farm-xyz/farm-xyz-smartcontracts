@@ -1,0 +1,14 @@
+{
+  "mumbai": {
+    "USDCToken": "0x85111aF7Af9d768D928d8E0f893E793625C00bd1",
+    "FarmFixedRiskWallet": "0x8f27AfAa99475E6D9622883d420010cD399fd289",
+    "FarmFixedRiskWalletSetup": true,
+    "FarmXYZPlatformBridge": "0x2F56A6499328606c1538b0C4FE0249041bb79031",
+    "FarmXYZStrategy": "0x28aa80082Be74D6fD48934CD9164580D25413590",
+    "FarmXYZStrategyWhitelisted": true,
+    "XAssetShareToken": "0x630d7bdC0d15C3511c2DFF02c2B2E0fC68E071c1",
+    "XAssetBase": "0xA4DAB08d963eaa5011FEA3a34f91066401C9FBb7",
+    "XAssetBaseSetup": true,
+    "XAssetMacros": "0x776977E2869F76343F07930857f8d9C794f39597"
+  }
+}

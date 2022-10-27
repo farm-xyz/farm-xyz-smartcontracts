@@ -35,7 +35,10 @@ contract XAssetMacros is Ownable, IXAssetMacros {
         if (IERC20(token).allowance(address(this), xAsset) < amount) {
             IERC20(token).approve(xAsset, MAX_INT);
         }
-        return IXAsset(xAsset).invest(IERC20Metadata(token), amount);
+        uint256 shares = IXAsset(xAsset).invest(IERC20Metadata(token), amount);
+//        require(IXAsset(xAsset).getBaseToken().transfer(msg.sender, baseTokenAmount), "ERC20: transfer failed");
+        require(IXAsset(xAsset).shareToken().transfer(msg.sender, shares), "ERC20: transfer failed");
+        return shares;
     }
 
     function withdrawFromXAsset(
