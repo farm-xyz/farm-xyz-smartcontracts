@@ -16,6 +16,7 @@ import hre = require("hardhat");
 import FirestoreDataConverter = firestore.FirestoreDataConverter;
 import WriteBatch = firestore.WriteBatch;
 import setLogFunction = firestore.setLogFunction;
+import {XAssetModel} from "../utils/XAsset";
 
 const BASE_URL = 'https://farm-xyz-backend.master.d.com.ro';
 
@@ -28,28 +29,8 @@ const contracts: { [key: string]: { [key: string]: string } } = {
 
 const TIME_BETWEEN_UPDATES = 2000;
 
-class XAsset {
-    id: string;
-    name: string | undefined;
-    change: number | undefined;
-    safetyScore: number | undefined;
-    realAPY: { realAPY1m: number, realAPY6m: number, realAPY3m: number } | undefined;
-    icon: string | undefined;
-    platform: string | undefined;
-    address: string;
-    chain: string | undefined;
-    price: string | undefined;
-    isTestNet: boolean = false;
-    priceToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string, displayDecimals: number } | undefined;
-    shareToken: { name: string, ticker: string, tokenContract: string, decimals: number, interfaceType: string, displayDecimals: number } | undefined;
-    chart: { t:any, o: string, h: string, l: string, c: string }[] | undefined;
-
+class XAsset extends XAssetModel {
     #contract: XAssetBase | undefined;
-
-    constructor(id: string, address: string) {
-        this.address = address;
-        this.id = id;
-    }
 
     get contract(): XAssetBase {
         if (!this.#contract) {
@@ -58,25 +39,6 @@ class XAsset {
         return this.#contract;
     }
 
-    static fromDbData(data: any): XAsset {
-        let ret = new XAsset(data.id, data.address);
-        ret.name = data.name;
-        ret.change = data.percentage;
-        ret.safetyScore = data.safetyScore;
-        ret.realAPY = {
-            realAPY1m: data.xassetAPY.realAPY1m,
-            realAPY3m: data.xassetAPY.realAPY3m,
-            realAPY6m: data.xassetAPY.realAPY6m,
-        };
-        ret.icon = data.media.publicUrl;
-        ret.platform = data.platformName;
-        ret.chain = data.blockchain.name;
-        ret.price = data.price;
-        ret.isTestNet = data.blockchain.isTestNet;
-        ret.priceToken = data.priceToken;
-        ret.shareToken = data.shareToken;
-        return ret;
-    }
 }
 
 const xAssetFirebaseConverter: FirestoreDataConverter<XAsset> = {
@@ -345,7 +307,7 @@ async function main() {
             const blockInfo = await ethers.provider.getBlock(blockNumber);
             let time = moment.unix(blockInfo.timestamp).toISOString();
             console.log(blockInfo.timestamp, time);
-            if (blockInfo.timestamp - lastProcessedBlockTime < 5) {
+            if (blockInfo.timestamp - lastProcessedBlockTime < 30) {
                 return;
             }
             lastProcessedBlockTime = blockInfo.timestamp;

@@ -53,7 +53,8 @@
   "scripts": {
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
-    "monitor": "npx hardhat run --network mumbai scripts/xassets/monitor-xassets.ts"
+    "monitor": "npx hardhat run --network mumbai scripts/xassets/monitor-xassets.ts",
+    "manage-xasset-price": "npx hardhat run --network mumbai scripts/xassets/manage-xasset-price.ts"
   },
   "author": "",
   "license": "ISC",

@@ -10,5 +10,17 @@
     "XAssetBase": "0xA4DAB08d963eaa5011FEA3a34f91066401C9FBb7",
     "XAssetBaseSetup": true,
     "XAssetMacros": "0x776977E2869F76343F07930857f8d9C794f39597"
+  },
+  "old-mumbai": {
+    "USDCToken": "0x85111aF7Af9d768D928d8E0f893E793625C00bd1",
+    "FarmFixedRiskWallet": "0x5E4Ab66973208db6de170B86ceBAc49B355f3BFd",
+    "FarmFixedRiskWalletSetup": true,
+    "FarmXYZPlatformBridge": "0xBe08EE530EC762C3EBaB7F9C8435578812A46E91",
+    "FarmXYZStrategy": "0x979Cb933CCd8373A2eb58e4dbc907E46e92d0369",
+    "FarmXYZStrategyWhitelisted": true,
+    "XAssetShareToken": "0x439390f8CC0CAAb29aD40a1325C256920011dd86",
+    "XAssetBase": "0x96Dc31182A70006F32e3abb7e85242CDe25ca7Ec",
+    "XAssetBaseSetup": true,
+    "XAssetMacros": "0x6672451B8510d16E6f0A353329b12D0f0B33ce04"
   }
 }
