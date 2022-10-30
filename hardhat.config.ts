@@ -38,7 +38,8 @@ const { ETH_MAINNET_RPC_PROVIDER,
         POLYGON_PRIVATE_KEY,
         POLYGONSCAN_API_KEY,
         TEST_ACCOUNT2_PRIVATE_KEY,
-        TEST_ACCOUNT3_PRIVATE_KEY } = process.env;
+        TEST_ACCOUNT3_PRIVATE_KEY,
+        FARM_XYZ_POOLS_CONTROL_KEY} = process.env;
 
 
 const config: HardhatUserConfig = {
@@ -65,6 +66,10 @@ const config: HardhatUserConfig = {
         },
         {
           privateKey: TEST_ACCOUNT3_PRIVATE_KEY as string,
+          balance: ethers.utils.parseEther("10000000").toString(),
+        },
+        {
+          privateKey: FARM_XYZ_POOLS_CONTROL_KEY as string,
           balance: ethers.utils.parseEther("10000000").toString(),
         }
       ]

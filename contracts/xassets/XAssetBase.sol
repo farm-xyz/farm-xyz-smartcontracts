@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@opengsn/contracts/src/ERC2771Recipient.sol";
+import "@prb/proxy/contracts/IPRBProxyRegistry.sol";
 
 import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
@@ -39,6 +40,8 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
      * The share token emitted by the XASSET
      */
     XAssetShareToken private _shareToken;
+
+    IPRBProxyRegistry private _proxyRegistry;
 
     bool private _strategyIsInitialized;
 
@@ -97,6 +100,7 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
         _strategyIsInitialized = false;
         _initialInvestmentDone = false;
         _acceptedPriceDifference = 1000;
+        _proxyRegistry = IPRBProxyRegistry(0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -158,9 +162,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
     }
 
     function _checkPriceDifference(uint256 priceBefore, uint256 priceAfter)
-    internal
-    view
-    returns (uint256)
+        internal
+        view
+        returns (uint256)
     {
         if (priceBefore > priceAfter) {
             require(
@@ -178,9 +182,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
     }
 
     function invest(IERC20Metadata token, uint256 amount)
-    external
-    override
-    returns (uint256)
+        external
+        override
+        returns (uint256)
     {
 //        console.log("[xasset][invest] token: %s, amount: %s", token.symbol(), amount);
         require(_shareToken.totalSupply() > 0, "Initial investment is not done yet");
@@ -229,11 +233,22 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
         return shares;
     }
 
-    function withdraw(uint256 shares) external override returns (uint256) {
-        require(
-            _shareToken.balanceOf(_msgSender()) >= shares,
-            "You don't own enough shares"
-        );
+    function _withdrawFrom(address owner, uint256 shares) private returns (uint256) {
+        if (_msgSender() != owner) {
+            require(
+                address(_proxyRegistry.getCurrentProxy(owner)) == _msgSender(),
+                "Only owner or proxy can withdraw"
+            );
+            require(
+                _shareToken.balanceOf(owner) >= shares,
+                "You don't own enough shares"
+            );
+        } else {
+            require(
+                _shareToken.balanceOf(_msgSender()) >= shares,
+                "You don't own enough shares"
+            );
+        }
         uint256 totalAssetValueBeforeWithdraw = _strategy.getTotalAssetValue();
 //        console.log("[xasset][withdraw] totalAssetValueBeforeWithdraw: %s", totalAssetValueBeforeWithdraw);
         uint256 pricePerShareBeforeWithdraw = this.getSharePrice();
@@ -250,8 +265,8 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
             withdrawn == amountToWithdraw,
             "Withdrawal amount does not match"
         );
-        require(_baseToken.transfer(_msgSender(), withdrawn), "ERC20: transfer failed");
-        _shareToken.burn(_msgSender(), shares);
+        require(_baseToken.transfer(owner, withdrawn), "ERC20: transfer failed");
+        _shareToken.burn(owner, shares);
 
         uint256 totalAssetValueAfterWithdraw = _strategy.getTotalAssetValue();
         uint256 pricePerShareAfterWithdraw = (totalAssetValueAfterWithdraw *
@@ -260,8 +275,17 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
             pricePerShareBeforeWithdraw,
             pricePerShareAfterWithdraw
         );
-        emit Withdraw(_msgSender(), amountToWithdraw);
+        emit Withdraw(owner, amountToWithdraw);
         return amountToWithdraw;
+    }
+
+    function withdrawFrom(address owner, uint256 shares) external override returns (uint256) {
+        return _withdrawFrom(owner, shares);
+    }
+
+    function withdraw(uint256 shares) external override returns (uint256)
+    {
+        return _withdrawFrom(_msgSender(), shares);
     }
 
     function getBaseToken() override external view returns (IERC20Metadata)

@@ -1,7 +1,7 @@
 import { ethers, upgrades } from "hardhat";
 import {parseUnits} from "ethers/lib/utils";
 import {BigNumber} from "ethers";
-import {ERC20, FarmFixedRiskWallet, XAssetBase} from "../../typechain";
+import {ERC20, FarmConfigSet, FarmFixedRiskWallet, XAssetBase} from "../../typechain";
 import hre = require("hardhat");
 import {timeout} from "../../test/helpers/utils";
 import {getPRBProxyRegistry, PRBProxyRegistry} from "@prb/proxy";
@@ -49,8 +49,18 @@ async function main() {
 
     saveValue('USDCToken', usdcToken.address);
 
-    const totalRewardPool = parseUnits("3000", await usdcToken.decimals());
+    const totalRewardPool = parseUnits("100", await usdcToken.decimals());
     const returnsPaybackPeriod = BigNumber.from(90*24*3600);
+
+
+    const FarmConfigSetFactory = await ethers.getContractFactory("FarmConfigSet");
+    const farmXYZConfigSetProxy = await upgrades.deployProxy(FarmConfigSetFactory,
+            [],
+            {kind: "uups"});
+    let farmXYZConfigSet = farmXYZConfigSetProxy as FarmConfigSet;
+    await farmXYZConfigSet.deployed();
+    saveValue('FarmConfigSet', farmXYZConfigSet.address);
+    console.log("FarmConfigSet deployed to:", farmXYZConfigSet.address);
 
     console.log("Deploying FarmFixedRiskWallet...");
     const FarmFixedRiskWalletFactory = await ethers.getContractFactory("FarmFixedRiskWallet");
@@ -65,7 +75,7 @@ async function main() {
     console.log("Setting up FarmFixedRiskWallet...");
     await usdcToken.approve(farmXYZFarm.address, totalRewardPool);
     await farmXYZFarm.depositToReturnsPool(totalRewardPool);
-    await farmXYZFarm.setPaybackPeriod(returnsPaybackPeriod);
+    await farmXYZConfigSet.loadConfigs([ { farm: farmXYZFarm.address, returnsPeriod: returnsPaybackPeriod } ]);
     await farmXYZFarm.setWhitelistEnabled(true);
     console.log("FarmFixedRiskWallet setup done.");
     saveValue('FarmFixedRiskWalletSetup', true);

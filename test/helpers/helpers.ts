@@ -17,6 +17,7 @@ import {getPRBProxy, getPRBProxyRegistry, PRBProxyRegistry} from "@prb/proxy";
 import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
 import {PRBProxy} from "@prb/proxy/dist/types/PRBProxy";
 import hre = require("hardhat");
+import {Test} from "mocha";
 
 type BaseWalletsAndTokens = {
   usdcToken: ERC20,
@@ -40,8 +41,13 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
   let usdcToken:ERC20;
   let usdcTokenDecimals = 18;
   if (hre.network.name === "hardhat") {
-    usdcToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
-    usdcTokenDecimals = await usdcToken.decimals();
+    const TestTokenFactory = await ethers.getContractFactory("TestToken");
+    const testToken = await TestTokenFactory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as TestToken;
+    usdcToken = testToken;
+    usdcTokenDecimals = await testToken.decimals();
+    await testToken.mint(owner.address, parseUnits("100000000", usdcTokenDecimals));
+    await testToken.mint(john.address, parseUnits("100000000", usdcTokenDecimals));
+    await testToken.mint(alice.address, parseUnits("100000000", usdcTokenDecimals));
 
     /*
     usdcToken = ERC20Factory.attach("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");

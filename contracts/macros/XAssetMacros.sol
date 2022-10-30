@@ -23,30 +23,29 @@ contract XAssetMacros is Ownable, IXAssetMacros {
 
 
     function investIntoXAsset(
-        address xAsset,
-        address token,
+        IXAsset xAsset,
+        IERC20 token,
         uint256 amount
     //        int slippage
     ) override external returns (uint256) {
-        if (IERC20(token).allowance(_msgSender(), address(this)) < amount) {
-            IERC20(token).approve(address(this), MAX_INT);
+        if (token.allowance(_msgSender(), address(this)) < amount) {
+            token.approve(address(this), MAX_INT);
         }
-        require(IERC20(token).transferFrom(_msgSender(), address(this), amount));
-        if (IERC20(token).allowance(address(this), xAsset) < amount) {
-            IERC20(token).approve(xAsset, MAX_INT);
+        require(token.transferFrom(_msgSender(), address(this), amount));
+        if (token.allowance(address(this), address(xAsset)) < amount) {
+            token.approve(address(xAsset), MAX_INT);
         }
-        uint256 shares = IXAsset(xAsset).invest(IERC20Metadata(token), amount);
+        uint256 shares = xAsset.invest(IERC20Metadata(address(token)), amount);
 //        require(IXAsset(xAsset).getBaseToken().transfer(msg.sender, baseTokenAmount), "ERC20: transfer failed");
-        require(IXAsset(xAsset).shareToken().transfer(msg.sender, shares), "ERC20: transfer failed");
+        require(xAsset.shareToken().transfer(_msgSender(), shares), "ERC20: transfer failed");
         return shares;
     }
 
     function withdrawFromXAsset(
-        address xAsset,
+        IXAsset xAsset,
         uint256 shares
     ) override external returns (uint256) {
-        uint256 baseTokenAmount = IXAsset(xAsset).withdraw(shares);
-        require(IXAsset(xAsset).getBaseToken().transfer(msg.sender, baseTokenAmount), "ERC20: transfer failed");
+        uint256 baseTokenAmount = xAsset.withdrawFrom(_msgSender(), shares);
         return baseTokenAmount;
     }
 

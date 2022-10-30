@@ -21,6 +21,11 @@ interface IXAsset {
     function withdraw(uint256 amount) external returns (uint256);
 
     /**
+     * @dev Withdraws a number of shares from the XASSET
+     */
+    function withdrawFrom(address owner, uint256 shares) external returns (uint256);
+
+    /**
      * @param amount - The amount of shares to calculate the value of
      * @return The value of amount shares in baseToken
      */

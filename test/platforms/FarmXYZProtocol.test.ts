@@ -1,5 +1,6 @@
 import {
     ERC20,
+    FarmConfigSet,
     FarmFixedRiskWallet,
     FarmXYZPlatformBridge,
     FarmXYZStrategy,
@@ -18,7 +19,7 @@ import "hardhat-gas-reporter"
 import {getProxyForSigner, initializeBaseWalletsAndTokens, setBaseWalletsAndTokens, usdc} from "../helpers/helpers";
 import fs, {readFileSync} from "fs";
 import {parseUnits} from "ethers/lib/utils";
-import {timeout} from "../helpers/utils";
+// import {timeout} from "../helpers/utils";
 import hre = require("hardhat");
 
 
@@ -36,8 +37,6 @@ describe.only("FarmXYZProtocol XAssets", async () => {
     let owner: SignerWithAddress;
     let john: SignerWithAddress;
     let alice: SignerWithAddress;
-
-    let farmXYZFarm: FarmFixedRiskWallet;
 
     let ownerProxy: PRBProxy;
 
@@ -79,6 +78,7 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         fs.writeFileSync('config.json', configJson);
     }
 
+    // noinspection JSUnusedLocalSymbols
     async function initializeAndConnectToExistingContracts()
     {
         [owner, john, alice] = await ethers.getSigners();
@@ -92,13 +92,12 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         ownerProxy = await getProxyForSigner(owner);
 
         totalRewardPool = usdc("1000000");
-        const returnsPaybackPeriod = BigNumber.from(365*2*24*3600);
 
         // Then let's initialize the reward farm
 
         // Now let's initialize the XAsset
-        const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
-        const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
+        // const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
+        // const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
         const XAssetBase = await ethers.getContractFactory("XAssetBase");
         const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
         const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
@@ -128,22 +127,38 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         totalRewardPool = usdc("1000000");
         const returnsPaybackPeriod = BigNumber.from(365*2*24*3600);
 
+        const FarmConfigSet = await ethers.getContractFactory("FarmConfigSet");
         const FarmFixedRiskWallet = await ethers.getContractFactory("FarmFixedRiskWallet");
         const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
         const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
         const XAssetBase = await ethers.getContractFactory("XAssetBase");
-        const XAssetBaseV2 = await ethers.getContractFactory("XAssetBaseV2");
+        // const XAssetBaseV2 = await ethers.getContractFactory("XAssetBaseV2");
         const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
         const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
 
-        let farmXYZFarm;
 
         // Then let's initialize the reward farm
+
+        let farmXYZConfigSet;
+        if (!forceRedeploy && config['FarmConfigSet']) {
+            farmXYZConfigSet = FarmConfigSet.attach(config['FarmConfigSet']) as FarmConfigSet;
+        } else {
+            const farmXYZConfigSetProxy = await upgrades.deployProxy(FarmConfigSet,
+                [],
+                {kind: "uups"});
+            farmXYZConfigSet = farmXYZConfigSetProxy as FarmConfigSet;
+            await farmXYZConfigSet.deployed();
+            config['FarmConfigSet'] = farmXYZConfigSet.address;
+            saveConfig();
+            console.log("FarmConfigSet deployed to:", farmXYZConfigSet.address);
+        }
+
+        let farmXYZFarm;
         if (!forceRedeploy && config['FarmFixedRiskWallet']) {
             farmXYZFarm = FarmFixedRiskWallet.attach(config['FarmFixedRiskWallet']) as FarmFixedRiskWallet;
         } else {
             const farmXYZFarmProxy = await upgrades.deployProxy(FarmFixedRiskWallet,
-                [usdcToken.address],
+                [ usdcToken.address, farmXYZConfigSet.address ],
                 {kind: "uups"});
             farmXYZFarm = farmXYZFarmProxy as FarmFixedRiskWallet;
             await farmXYZFarm.deployed();
@@ -155,7 +170,7 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         if (forceRedeploy || !config['FarmFixedRiskWalletInitialised']) {
             await usdcToken.approve(farmXYZFarm.address, totalRewardPool);
             await farmXYZFarm.depositToReturnsPool(totalRewardPool);
-            await farmXYZFarm.setPaybackPeriod(returnsPaybackPeriod);
+            await farmXYZConfigSet.loadConfigs([ { farm: farmXYZFarm.address, returnsPeriod: returnsPaybackPeriod } ]);
             await farmXYZFarm.setWhitelistEnabled(true);
             config['FarmFixedRiskWalletInitialised'] = true;
             saveConfig();
@@ -218,9 +233,10 @@ describe.only("FarmXYZProtocol XAssets", async () => {
             xassetProxy = XAssetBase.attach(config['XAssetBase']) as XAssetBase;
 
             if (config['upgrade'] && config['upgrade']['XAssetBase']) {
-                console.log("Upgrading XAssetBase contract at", xassetProxy.address);
-                const oldContract = await upgrades.forceImport(config['XAssetBase'], XAssetBase, { kind: "uups" });
-                xassetProxy = await upgrades.upgradeProxy(xassetProxy.address, XAssetBaseV2, {kind: "uups"});
+                throw new Error("XAssetBase upgrade not implemented");
+                // console.log("Upgrading XAssetBase contract at", xassetProxy.address);
+                // const oldContract = await upgrades.forceImport(config['XAssetBase'], XAssetBase, { kind: "uups" });
+                // xassetProxy = await upgrades.upgradeProxy(xassetProxy.address, XAssetBaseV2, {kind: "uups"});
             }
 
         }
@@ -290,6 +306,23 @@ describe.only("FarmXYZProtocol XAssets", async () => {
     });
 
 
+    async function withdrawHalfShares(owner: SignerWithAddress) {
+        // const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(owner.address);
+
+        let ownedShares = await xAsset.getTotalSharesOwnedBy(owner.address);
+        console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
+        const halfOwnedShares = ownedShares.div(BigNumber.from(2));
+
+        // withdraw half of the shares
+        await withdraw(owner, halfOwnedShares);
+        // TODO: check balances!!!!
+
+        ownedShares = await xAsset.getTotalSharesOwnedBy(owner.address);
+        console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
+
+        expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
+    }
+
     describe('Invest', () => {
 
         it('should allow users to invest a specific token amount', async () => {
@@ -319,10 +352,9 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         it('should allocate shares for the specific investment', async () => {
             const amount = usdc("10");
 
-            const johnProxy = await getProxyForSigner(john);
-            const sharesBefore = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
+            const sharesBefore = await xAsset.getTotalSharesOwnedBy(john.address);
             await invest(john, amount);
-            const sharesAfter = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
+            const sharesAfter = await xAsset.getTotalSharesOwnedBy(john.address);
 
             expect(sharesAfter).to.greaterThan(sharesBefore);
         })
@@ -350,14 +382,12 @@ describe.only("FarmXYZProtocol XAssets", async () => {
             const amount = usdc("10");
             const pricePerShareBefore = await xAsset.getSharePrice();
 
-            // await invest(owner, amount);
-            // await xAsset.connect(owner).invest(usdcToken.address, amount);
+            await invest(owner, amount);
 
-            // await resetToBlock(33029130);
+            const pricePerShareAfter = await xAsset.getSharePrice();
 
-            // const pricePerShareAfter = await xAsset.getSharePrice();
-
-            // expect(pricePerShareAfter.sub(pricePerShareBefore)).to.be.lt(10);
+            expect(pricePerShareBefore).to.be.gt(0);
+            expect(pricePerShareAfter).to.be.gt(0);
         })
 
         it('should return new price once a new block is mined', async () => {
@@ -420,20 +450,7 @@ describe.only("FarmXYZProtocol XAssets", async () => {
 
             await time.increase(15*25*3600);
 
-            const johnProxy = await getProxyForSigner(john);
-            const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(johnProxy.address);
-            let ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
-            console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
-            const halfOwnedShares = ownedShares.div(BigNumber.from(2));
-
-            // withdraw half of the shares
-            await withdraw(john, halfOwnedShares);
-            // TODO: check balances!!!!
-
-            ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
-            console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
-
-            expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
+            await withdrawHalfShares(john);
 
         })
 
@@ -462,40 +479,24 @@ describe.only("FarmXYZProtocol XAssets", async () => {
 
             await invest(owner, amount);
 
-            const johnProxy = await getProxyForSigner(john);
-            const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(johnProxy.address);
-            let ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
-            console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
-            const halfOwnedShares = ownedShares.div(BigNumber.from(2));
-
-            // withdraw half of the shares
-            await withdraw(john, halfOwnedShares);
-            // TODO: check balances!!!!
-
-            ownedShares = await xAsset.getTotalSharesOwnedBy(johnProxy.address);
-            console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
-
-            expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
+            await withdrawHalfShares(john);
 
         })
 
         it('should calculate the total value owned by an address', async () => {
             const amount = usdc("10");
 
-            const johnProxy = await getProxyForSigner(john);
             // calculate how many $ the user has initially
-            const valueOwnedBefore = await xAsset.getTotalValueOwnedBy(johnProxy.address);
+            const valueOwnedBefore = await xAsset.getTotalValueOwnedBy(john.address);
 
             // invest some tokens
             await invest(john, amount);
 
             // calculate how many $ the user has after investing
-            const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(johnProxy.address);
-            console.log('valueOwnedAfter', web3.utils.fromWei(valueOwnedAfter.toString()));
+            const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(john.address);
+            let diff = valueOwnedAfter.sub(valueOwnedBefore.add(amount));
 
-            const valueDifference = valueOwnedAfter.sub(amount).abs();
-            console.log('valueDifference', web3.utils.fromWei(valueDifference.toString()));
-            expect(valueDifference).to.be.lte(5);
+            expect(diff).to.be.lte(1000);
         })
 
         it('should calculate the amount of shares received for a specified token and amount', async () => {

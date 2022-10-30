@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./IFarmXYZPool.sol";
+import "./FarmConfigSet.sol";
 //import "hardhat/console.sol";
 //import "../../utils/log.sol";
 
@@ -19,7 +20,8 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
 
     uint256 public _totalValueDeposited;
     uint256 public _totalReturnsDeposited;
-    uint256 private _returnsPaybackPeriod;
+
+    FarmConfigSet private _farmConfigSet;
 
     bool private _isWhitelistOnly;
 
@@ -32,20 +34,21 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
     /**
      * @param token - The token users can stake
     */
-    function initialize(IERC20 token) initializer external {
+    function initialize(IERC20 token, FarmConfigSet configSet) initializer external {
         __Ownable_init();
         __UUPSUpgradeable_init();
 
         _token = token;
         _totalValueDeposited = 0;
-        _returnsPaybackPeriod = 62 days;
+        _farmConfigSet = configSet;
+        _farmConfigSet.setReturnsPeriod(address(this), 62 days);
         _isWhitelistOnly = false;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function setPaybackPeriod(uint256 paybackPeriod) public onlyOwner {
-        _returnsPaybackPeriod = paybackPeriod;
+        _farmConfigSet.setReturnsPeriod(address(this), paybackPeriod);
     }
 
     function setWhitelistEnabled(bool whitelistEnabled) public onlyOwner {
@@ -153,7 +156,7 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
     }
 
     function calculateRatePerSecond() internal view returns (uint256) {
-        return RATE_DENOMINATOR * _totalReturnsDeposited / _returnsPaybackPeriod / _totalValueDeposited;
+        return RATE_DENOMINATOR * _totalReturnsDeposited / _farmConfigSet.getReturnsPeriod(address(this)) / _totalValueDeposited;
     }
 
     /**
