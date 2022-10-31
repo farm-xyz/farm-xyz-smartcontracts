@@ -309,7 +309,7 @@ async function main() {
             const blockInfo = await ethers.provider.getBlock(blockNumber);
             let time = moment.unix(blockInfo.timestamp).toISOString();
             console.log(blockInfo.timestamp, time);
-            if (blockInfo.timestamp - lastProcessedBlockTime < 30) {
+            if (blockInfo.timestamp - lastProcessedBlockTime < 15) {
                 return;
             }
             lastProcessedBlockTime = blockInfo.timestamp;
@@ -323,7 +323,7 @@ async function main() {
                 const name = xAsset.name;
                 const price = await xAsset.contract?.getSharePrice();
                 console.log("Price for xAsset ", name, " at block ", blockNumber, ": ", price?.toString());
-                let response = await FarmXYZTools.setXAssetPrice(BASE_URL, xAsset, price?.toString(), time);
+                let response = await FarmXYZTools.setXAssetPrice(BASE_URL, xAsset, time, price);
                 let xAssetUpdate = XAsset.fromDbData(response.data.data.xAsset);
                 let candlePromises = [];
                 let promise1dCandles: Promise<any> | null = null;
