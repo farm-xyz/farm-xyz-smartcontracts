@@ -157,6 +157,7 @@ async function getXAssetPriceHistory(xAsset: XAsset, interval: string, limit: nu
 }
 
 async function updateXAssetFirebaseChartData(batch: WriteBatch | null, xAsset: XAsset, interval: string, candles: any[]) {
+    let updates = 0;
     if (!xAssetCharts[xAsset.id]) {
         xAssetCharts[xAsset.id] = {};
     }
@@ -181,11 +182,14 @@ async function updateXAssetFirebaseChartData(batch: WriteBatch | null, xAsset: X
             console.log("Updating chart data for ", xAsset.id, interval, candle.t);
             if (batch) {
                 batch?.set(db.collection('charts').doc(xAsset.id).collection(interval).doc(candle.t.toString()), candle);
+                updates++;
             } else {
                 await db.collection('charts/' + xAsset.id + '/' + interval).doc(candle.t.toString()).set(candle);
+                updates++;
             }
         }
     }
+    return updates;
 }
 
 async function getFirebaseChartData() {
@@ -314,6 +318,7 @@ async function main() {
             }
             lastProcessedBlockTime = blockInfo.timestamp;
             let batch = db.batch();
+            let batchCount = 0;
             // let batch:WriteBatch|null = null;
             if (blockInfo.timestamp - lastXAssetSyncTime > 60) {
                 await updateXAssetList(batch);
@@ -338,6 +343,7 @@ async function main() {
                     xAssetUpdate.chart = candles;
                     if (batch) {
                         batch.set(xAssetCollection.doc(xAssetUpdate.id), xAssetUpdate);
+                        batchCount+=1;
                     } else {
                         await xAssetCollection.doc(xAssetUpdate.id).set(xAssetUpdate);
                     }
@@ -345,7 +351,13 @@ async function main() {
                 await Promise.all(candlePromises).then(async candles => {
                     for (let i = 0; i < intervals.length; i++) {
                         console.log('Updating ', xAssetUpdate.id, ' ', intervals[i], ' candles');
-                        await updateXAssetFirebaseChartData(batch, xAsset, intervals[i], candles[i]);
+                        batchCount += await updateXAssetFirebaseChartData(batch, xAsset, intervals[i], candles[i]);
+                        if (batchCount>400) {
+                            console.log(`${batchCount} updates pending, committing`);
+                            await batch.commit();
+                            batch=db.batch();
+                            batchCount = 0;
+                        }
                     }
                 }).catch(e => {
                     console.error("Error getting xAsset price history: ", e);
@@ -356,8 +368,10 @@ async function main() {
                 // console.log(response.data);
                 // console.log(response.data.data.xAsset);
             }
-            if (batch)
+            if (batch) {
                 await batch.commit();
+                batchCount = 0;
+            }
 
         } catch (e:any) {
             console.error("Error processing block: ", e);
