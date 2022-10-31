@@ -2,6 +2,7 @@ import fs from "fs";
 import {ethers} from "hardhat";
 import axios from "axios";
 import {XAssetModel} from "./XAsset";
+import {BigNumberish} from "ethers";
 
 const {BooleanPrompt, Input, NumberPrompt} = require('enquirer');
 const Confirm = require('prompt-confirm');
@@ -244,6 +245,15 @@ export namespace FarmXYZTools {
       }
     }
     return xAssetList;
+  }
+
+  export async function setXAssetPrice(baseURL:string, xAsset:XAssetModel, time: string, price: BigNumberish)
+  {
+    return await axios.post(baseURL + '/api/v1/xasset-price', {
+      xAssetId: xAsset.id,
+      price: price?.toString(),
+      time: time
+    });
   }
 
 }

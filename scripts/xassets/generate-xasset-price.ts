@@ -130,6 +130,7 @@ async function main() {
         xAssetConfigs[xAsset.address].priceModifiers=[];
         fs.closeSync(fp);
         console.timeEnd("Price generation for " + xAsset.address);
+        break;
     }
 
 }

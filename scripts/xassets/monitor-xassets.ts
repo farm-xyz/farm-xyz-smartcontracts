@@ -17,6 +17,7 @@ import FirestoreDataConverter = firestore.FirestoreDataConverter;
 import WriteBatch = firestore.WriteBatch;
 import setLogFunction = firestore.setLogFunction;
 import {XAssetModel} from "../utils/XAsset";
+import {FarmXYZTools} from "../utils/FarmXYZTools";
 
 const BASE_URL = 'https://farm-xyz-backend.master.d.com.ro';
 
@@ -87,7 +88,8 @@ const candleLimitPerInterval:{ [key: string]: number } = {
     '5m': 100, //60*24/5,
     '1h': 24,
     '1d': 30,
-    '1w': 52
+    '1w': 52,
+    '1mo': 6
 };
 
 let firestoreXassetList: any[] = [];
@@ -321,11 +323,7 @@ async function main() {
                 const name = xAsset.name;
                 const price = await xAsset.contract?.getSharePrice();
                 console.log("Price for xAsset ", name, " at block ", blockNumber, ": ", price?.toString());
-                let response = await axios.post(BASE_URL + '/api/v1/xasset-price', {
-                    xAssetId: xAsset.id,
-                    price: price?.toString(),
-                    time: time
-                });
+                let response = await FarmXYZTools.setXAssetPrice(BASE_URL, xAsset, price?.toString(), time);
                 let xAssetUpdate = XAsset.fromDbData(response.data.data.xAsset);
                 let candlePromises = [];
                 let promise1dCandles: Promise<any> | null = null;
