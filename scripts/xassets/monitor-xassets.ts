@@ -82,7 +82,7 @@ const xAssetFirebaseConverter: FirestoreDataConverter<XAsset> = {
     }
 }
 
-const intervals=[ '1m', '5m', '1h', '1d', '1w' ];
+const intervals=[ '1m', '5m', '1h', '1d', '1w', '1mo' ];
 const candleLimitPerInterval:{ [key: string]: number } = {
     '1m': 100, //60*24,
     '5m': 100, //60*24/5,
