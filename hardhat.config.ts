@@ -53,7 +53,7 @@ const config: HardhatUserConfig = {
         // url: POLYGON_RPC_PROVIDER as string,
         // blockNumber: 33569661
         url: POLYGON_MUMBAI_RPC_PROVIDER as string,
-        blockNumber: 28652388
+        blockNumber: 28895947
       },
       accounts: [
         {

@@ -1,5 +1,7 @@
 import fs from "fs";
 import {ethers} from "hardhat";
+import axios from "axios";
+import {XAssetModel} from "./XAsset";
 
 const {BooleanPrompt, Input, NumberPrompt} = require('enquirer');
 const Confirm = require('prompt-confirm');
@@ -187,4 +189,61 @@ export namespace FarmXYZTools {
 
     return buildPath;
   }
+
+  export function getRandomData(numPoints:number, center:number,
+                         min:number, max:number,
+                         cycles:{ length: number, variance: number,
+                           noise: number, trend: number,
+                           phase: number,
+                           increment: number }[],
+                                intVal:boolean)
+  {
+    let result = [];
+    let phase = Math.random() * Math.PI;
+    let y = center;
+
+    function randomPlusMinus() { return (Math.random() * 2) - 1; }
+
+    cycles.forEach((thisCycle) => {
+      thisCycle.phase = Math.random() * Math.PI;
+      thisCycle.increment = Math.PI / thisCycle.length;
+    });
+
+    for (let i = 0; i < numPoints; i++)
+    {
+      cycles.forEach((thisCycle) => {
+        thisCycle.phase += thisCycle.increment * randomPlusMinus();
+        y += (Math.sin(thisCycle.phase) * (thisCycle.variance / thisCycle.length) * (randomPlusMinus() * thisCycle.noise)) + (thisCycle.trend / thisCycle.length);
+      });
+      if (min) y = Math.max(y,min);
+      if (max) y = Math.min(y,max);
+      if (intVal) y = Math.round(y);
+      result.push(y);
+    }
+
+    return result;
+  }
+
+  export async function readXAssets(baseURL:string) {
+    let xAssetList:XAssetModel[] = [];
+
+    let xAssetsListResponse;
+    try {
+      xAssetsListResponse = await axios.get(baseURL + '/api/v1/xasset/list');
+      console.log(xAssetsListResponse.data.data.items);
+      for (let xAssetData of xAssetsListResponse.data.data.items) {
+        let x = XAssetModel.fromDbData(xAssetData);
+
+        xAssetList.push(x);
+      }
+    } catch (e:any) {
+      if (e && e.response !== undefined) {
+        console.error("[][] Could not fetch xAssets list from backend: ", e, e.response.data);
+      } else {
+        console.error("[] Could not fetch xAssets list from backend: ", e);
+      }
+    }
+    return xAssetList;
+  }
+
 }

@@ -2,6 +2,7 @@ import { ethers, upgrades } from "hardhat";
 import {BigNumber, BigNumberish} from "ethers";
 import axios from "axios";
 import {XAssetModel} from "../utils/XAsset";
+import {FarmXYZTools} from "../utils/FarmXYZTools";
 
 const BASE_URL = 'https://farm-xyz-backend.master.d.com.ro';
 
@@ -23,94 +24,33 @@ const xAssetConfigs:{ [key: string] : {
     },
     '0xf4a4859C88aC69f68021F1B5467Fd43861D1065F': {
         farmAddress: '0x2dCC5f2Ca5A9da42f5e4C031423f7DA268AD86de',
-        paybackPeriods:  getRandomData(365,62,31,93,
+        paybackPeriods:  FarmXYZTools.getRandomData(365,62,31,93,
             [{ length: 7, variance: 50, noise: 1, trend: 0, phase: 0, increment: 0 },
                 { length: 365, variance: 30, noise: 1, trend: 0, phase: 0, increment: 0},
-                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}])
+                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}], false)
     },
     '0x89f381a066707E564ef8947869816E8b7939642a': {
         farmAddress: '0xaa215D92920C4FBB4187F32f907212D19b68bcDc',
-        paybackPeriods: getRandomData(365,51,31,93,
+        paybackPeriods: FarmXYZTools.getRandomData(365,51,31,93,
             [{ length: 7, variance: 50, noise: 1, trend: 0, phase: 0, increment: 0 },
                 { length: 365, variance: 30, noise: 1, trend: 0, phase: 0, increment: 0},
-                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}])
+                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}], false)
     },
     '0x056434C0e4779FA92ad951b8549b93D9E8FeAF30': {
         farmAddress: '0x0Fd8eff3e24128C89B94dEb53Cd0Fa34Ee57C81c',
-        paybackPeriods: getRandomData(365,78,31,93,
+        paybackPeriods: FarmXYZTools.getRandomData(365,78,31,93,
             [{ length: 7, variance: 50, noise: 1, trend: 0, phase: 0, increment: 0 },
                 { length: 365, variance: 30, noise: 1, trend: 0, phase: 0, increment: 0},
-                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}])
+                { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}], false)
     },
 }
 
-// <editor-fold desc="Generate random data">
-
-function getRandomData(numPoints:number, center:number,
-                       min:number, max:number,
-                       cycles:{ length: number, variance: number,
-                                noise: number, trend: number,
-                                phase: number,
-                                increment: number }[])
-{
-    let result = [];
-    let phase = Math.random() * Math.PI;
-    let y = center;
-
-    function randomPlusMinus() { return (Math.random() * 2) - 1; }
-
-    cycles.forEach((thisCycle) => {
-        thisCycle.phase = Math.random() * Math.PI;
-        thisCycle.increment = Math.PI / thisCycle.length;
-    });
-
-    for (let i = 0; i < numPoints; i++)
-    {
-        cycles.forEach((thisCycle) => {
-            thisCycle.phase += thisCycle.increment * randomPlusMinus();
-            y += (Math.sin(thisCycle.phase) * (thisCycle.variance / thisCycle.length) * (randomPlusMinus() * thisCycle.noise)) + (thisCycle.trend / thisCycle.length);
-        });
-        if (min) y = Math.max(y,min);
-        if (max) y = Math.min(y,max);
-        result.push(y);
-    }
-
-    return result;
-}
-
-let data = getRandomData(365,62,31,93,
-    [{ length: 7, variance: 50, noise: 1, trend: 0, phase: 0, increment: 0 },
-        { length: 365, variance: 30, noise: 1, trend: 0, phase: 0, increment: 0},
-        { length: 700, variance: 2, noise: 0, trend: 100, phase: 0, increment: 0}]);
-
-// </editor-fold>
-
-
 let xAssetList:XAssetModel[] = [];
-
-async function readXAssets() {
-    let xAssetsListResponse;
-    try {
-        xAssetsListResponse = await axios.get(BASE_URL + '/api/v1/xasset/list');
-        console.log(xAssetsListResponse.data.data.items);
-        for (let xAssetData of xAssetsListResponse.data.data.items) {
-            let x = XAssetModel.fromDbData(xAssetData);
-
-            xAssetList.push(x);
-        }
-    } catch (e:any) {
-        if (e && e.response !== undefined) {
-            console.error("[][] Could not fetch xAssets list from backend: ", e, e.response.data);
-        } else {
-            console.error("[] Could not fetch xAssets list from backend: ", e);
-        }
-    }
-}
 
 async function main() {
     const [ owner ] = await ethers.getSigners();
 
-    await readXAssets();
+    xAssetList = await FarmXYZTools.readXAssets(BASE_URL);
 
     const FarmConfigSetFactory = await ethers.getContractFactory("FarmConfigSet");
 
