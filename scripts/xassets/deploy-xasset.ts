@@ -1,11 +1,92 @@
 import { ethers, upgrades } from "hardhat";
 import {parseUnits} from "ethers/lib/utils";
 import {BigNumber, BigNumberish} from "ethers";
-import {ERC20, FarmConfigSet, FarmFixedRiskWallet, XAssetBase} from "../../typechain";
+import {ERC20, FarmConfigSet, FarmFixedRiskWallet, XAssetBase, XAssetShareToken} from "../../typechain";
 import hre = require("hardhat");
 import {timeout} from "../../test/helpers/utils";
 import {getPRBProxyRegistry, PRBProxyRegistry} from "@prb/proxy";
 import fs, {readFileSync} from "fs";
+
+let stableCoins:{ [key: string]: { [key: string]: any } } = {
+    'hardhat': { // hardhat clone of polygon mainnet
+        'USDC': {
+            address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+            contract: null
+        },
+        'USDT': {
+            address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+            contract: null
+        },
+        'DAI': {
+            address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
+            contract: null
+        },
+        'FRAX': {
+            address: '0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89',
+            contract: null
+        },
+        'agEUR': {
+            address: '0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4',
+            contract: null
+        },
+        'miMATIC': {
+            address: '0xa3Fa99A148fA48D14Ed51d610c367C61876997F1',
+            contract: null
+        }
+    },
+    'polygon': { // polygon mainnet
+        'USDC': {
+            address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+            contract: null
+        },
+        'USDT': {
+            address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+            contract: null
+        },
+        'DAI': {
+            address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
+            contract: null
+        },
+        'FRAX': {
+            address: '0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89',
+            contract: null
+        },
+        'agEUR': {
+            address: '0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4',
+            contract: null
+        },
+        'miMATIC': {
+            address: '0xa3Fa99A148fA48D14Ed51d610c367C61876997F1',
+            contract: null
+        }
+    },
+    'mumbai': { // polygon mumbai uses a TestToken instance for all of them
+        'USDC': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        },
+        'USDT': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        },
+        'DAI': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        },
+        'FRAX': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        },
+        'agEUR': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        },
+        'miMATIC': {
+            address: '0x85111aF7Af9d768D928d8E0f893E793625C00bd1',
+            contract: null
+        }
+    }
+};
 
 let config: { [key: string]: { [key: string]: any } } = {};
 
@@ -19,7 +100,6 @@ function readConfig() {
 }
 
 function saveConfig() {
-    if (hre.network.name=== 'hardhat') return;
     let configJson = JSON.stringify(config, null, 2);
     fs.writeFileSync('deploy.json', configJson);
 }
@@ -27,6 +107,28 @@ function saveConfig() {
 function saveValue(key:string, value:any) {
     if (!config[hre.network.name]) config[hre.network.name] = {};
     config[hre.network.name][key]=value;
+    saveConfig();
+}
+
+function getValue(key:string) {
+    if (config[hre.network.name] && config[hre.network.name][key])
+        return config[hre.network.name][key];
+    return null;
+}
+
+function getXAssetValue(xAssetData: { ticker: string}, key:string) {
+    const xAssetValuePrefix = 'XAsset-'+xAssetData.ticker;
+    let value = getValue(xAssetValuePrefix);
+    if (value && value[key])
+        return value[key];
+    return null;
+}
+
+function saveXAssetValue(xAssetData: { ticker: string}, key:string, value:any) {
+    const xAssetValuePrefix = 'XAsset-'+xAssetData.ticker;
+    if (!config[hre.network.name]) config[hre.network.name] = {};
+    if (!config[hre.network.name][xAssetValuePrefix]) config[hre.network.name][xAssetValuePrefix] = {};
+    config[hre.network.name][xAssetValuePrefix][key]=value;
     saveConfig();
 }
 
@@ -38,162 +140,255 @@ function unsetConfigKeys(keys:string[]) {
     saveConfig();
 }
 
-async function deployXAsset(xAssetData: { name: string, ticker: string, rewardPool: BigNumberish, returnsPeriod: BigNumberish },
-                            usdcToken: ERC20,
+async function deployXAsset(xAssetData: { name: string, ticker: string, stableCoin:ERC20, rewardPool: BigNumberish, returnsPeriod: BigNumberish },
                             farmXYZConfigSet: FarmConfigSet,
                             resume: boolean = false) {
+
+    console.group('Deploying XAsset', xAssetData.name);
+
     if (!resume)
         unsetConfigKeys(['latest_ticker', 'latest_FarmFixedRiskWallet', 'latest_FarmFixedRiskWalletSetup',
                             'latest_FarmXYZPlatformBridge', 'latest_FarmXYZStrategy', 'latest_FarmXYZStrategyWhitelisted',
                             'latest_XAssetShareToken', 'latest_XAssetBase', 'latest_XAssetBaseSetup']);
     saveValue('latest_ticker', xAssetData.ticker);
 
-    console.log("Deploying FarmFixedRiskWallet...");
+    let usdcToken = xAssetData.stableCoin;
+
+    let farmXYZFarm;
     const FarmFixedRiskWalletFactory = await ethers.getContractFactory("FarmFixedRiskWallet");
-    const farmXYZFarmProxy = await upgrades.deployProxy(FarmFixedRiskWalletFactory,
-        [usdcToken.address, farmXYZConfigSet.address],
-        {kind: "uups"});
-    const farmXYZFarm = farmXYZFarmProxy as FarmFixedRiskWallet;
-    await farmXYZFarm.deployed();
-    console.log("FarmFixedRiskWallet deployed to:", farmXYZFarm.address);
-    saveValue('latest_FarmFixedRiskWallet', farmXYZFarm.address);
+    if (resume && getXAssetValue(xAssetData, 'FarmFixedRiskWallet') == null) {
+        console.log("Deploying FarmFixedRiskWallet...");
+        const farmXYZFarmProxy = await upgrades.deployProxy(FarmFixedRiskWalletFactory,
+            [usdcToken.address, farmXYZConfigSet.address],
+            {kind: "uups"});
+        farmXYZFarm = farmXYZFarmProxy as FarmFixedRiskWallet;
+        await farmXYZFarm.deployed();
+        console.log("FarmFixedRiskWallet deployed to:", farmXYZFarm.address);
+        saveXAssetValue(xAssetData, 'FarmFixedRiskWallet', farmXYZFarm.address);
+    } else {
+        console.log("FarmFixedRiskWallet already deployed");
+        farmXYZFarm = FarmFixedRiskWalletFactory.attach(getXAssetValue(xAssetData, 'FarmFixedRiskWallet')) as FarmFixedRiskWallet;
+    }
 
-    console.log("Setting up FarmFixedRiskWallet...");
-    await usdcToken.approve(farmXYZFarm.address, xAssetData.rewardPool);
-    await farmXYZFarm.depositToReturnsPool(xAssetData.rewardPool);
-    await farmXYZConfigSet.loadConfigs([ { farm: farmXYZFarm.address, returnsPeriod: xAssetData.returnsPeriod } ]);
-    await farmXYZFarm.setWhitelistEnabled(true);
-    console.log("FarmFixedRiskWallet setup done.");
-    saveValue('latest_FarmFixedRiskWalletSetup', true);
+    if (resume && getXAssetValue(xAssetData, 'FarmFixedRiskWalletSetup') == null) {
+        console.log("Setting up FarmFixedRiskWallet...");
+        await usdcToken.approve(farmXYZFarm.address, xAssetData.rewardPool);
+        await farmXYZFarm.depositToReturnsPool(xAssetData.rewardPool);
+        await farmXYZConfigSet.loadConfigs([{farm: farmXYZFarm.address, returnsPeriod: xAssetData.returnsPeriod}]);
+        await farmXYZFarm.setWhitelistEnabled(true);
+        console.log("FarmFixedRiskWallet setup done.");
+        saveXAssetValue(xAssetData, 'FarmFixedRiskWalletSetup', true);
+    } else {
+        console.log("FarmFixedRiskWallet already setup");
+    }
 
 
-    const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
-    const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
-    const XAssetBase = await ethers.getContractFactory("XAssetBase");
-    const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
+    const FarmXYZPlatformBridgeFactory = await ethers.getContractFactory("FarmXYZPlatformBridge");
+    const FarmXYZStrategyFactory = await ethers.getContractFactory("FarmXYZStrategy");
+    const XAssetBaseFactory = await ethers.getContractFactory("XAssetBase");
+    const XAssetShareTokenFactory = await ethers.getContractFactory("XAssetShareToken");
 
-    console.log("Deploying FarmXYZPlatformBridge...");
-    const bridge = await upgrades.deployProxy(FarmXYZPlatformBridge, [], {kind: "uups"});
-    await bridge.deployed();
-    console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
-    saveValue('latest_FarmXYZPlatformBridge', bridge.address);
 
-    console.log("Deploying FarmXYZStrategy...");
-    const strategy = await upgrades.deployProxy(FarmXYZStrategy,
-        [bridge.address, farmXYZFarm.address, usdcToken.address],
-        {kind: "uups"});
-    await strategy.deployed();
-    saveValue('latest_FarmXYZStrategy', strategy.address);
-    console.log("FarmXYZStrategy deployed to:", strategy.address);
+    let bridge;
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZPlatformBridge') == null) {
+        console.log("Deploying FarmXYZPlatformBridge...");
+        bridge = await upgrades.deployProxy(FarmXYZPlatformBridgeFactory, [], {kind: "uups"});
+        await bridge.deployed();
+        console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
+        saveXAssetValue(xAssetData, 'FarmXYZPlatformBridge', bridge.address);
+    } else {
+        console.log("FarmXYZPlatformBridge already deployed");
+        bridge = FarmXYZPlatformBridgeFactory.attach(getXAssetValue(xAssetData, 'FarmXYZPlatformBridge'));
+    }
 
-    console.log("Adding FarmXYZStrategy to whitelist..");
-    await farmXYZFarm.addToWhitelist([ strategy.address ]);
-    saveValue('latest_FarmXYZStrategyWhitelisted', true);
-    console.log("FarmXYZStrategy added to whitelist.");
+    let strategy;
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZStrategy') == null) {
+        console.log("Deploying FarmXYZStrategy...");
+        strategy = await upgrades.deployProxy(FarmXYZStrategyFactory,
+            [bridge.address, farmXYZFarm.address, usdcToken.address],
+            {kind: "uups"});
+        await strategy.deployed();
+        saveXAssetValue(xAssetData, 'FarmXYZStrategy', strategy.address);
+        console.log("FarmXYZStrategy deployed to:", strategy.address);
+    } else {
+        console.log("FarmXYZStrategy already deployed");
+        strategy = FarmXYZStrategyFactory.attach(getXAssetValue(xAssetData, 'FarmXYZStrategy'));
+    }
 
-    console.log("Deploying XAssetShareToken...");
-    const _shareToken = await upgrades.deployProxy(XAssetShareToken,
-        [xAssetData.name, xAssetData.ticker],
-        {kind: "uups"});
-    await _shareToken.deployed();
-    saveValue('latest_XAssetShareToken', _shareToken.address);
-    console.log("XAssetShareToken deployed to:", _shareToken.address);
-    const shareToken = _shareToken as ERC20;
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZStrategyWhitelisted') == null) {
+        console.log("Adding FarmXYZStrategy to whitelist..");
+        await farmXYZFarm.addToWhitelist([strategy.address]);
+        saveXAssetValue(xAssetData, 'FarmXYZStrategyWhitelisted', true);
+        console.log("FarmXYZStrategy added to whitelist.");
+    } else {
+        console.log("FarmXYZStrategy already whitelisted");
+    }
 
-    console.log("Deploying XAssetBase...");
-    const _xasset = await upgrades.deployProxy(XAssetBase,
-        [xAssetData.ticker, usdcToken.address, _shareToken.address],
-        {kind: "uups"});
-    const xasset = _xasset as XAssetBase;
-    await xasset.deployed();
-    saveValue('latest_XAssetBase', xasset.address);
-    console.log("XAssetBase deployed to:", xasset.address);
 
-    console.log("Setting up XAssetBase...");
-    await _shareToken.setXAsset(xasset.address);
-    await xasset.setStrategy(strategy.address);
-    await usdcToken.transfer(xasset.address, parseUnits("10", await usdcToken.decimals()));
-    await xasset.executeInitialInvestment();
-    saveValue('latest_XAssetBaseSetup', true);
-    console.log("XAssetBase setup complete");
+    let shareToken:XAssetShareToken;
+    if (resume && getXAssetValue(xAssetData, 'XAssetShareToken') == null) {
+        console.log("Deploying XAssetShareToken...");
+        shareToken = await upgrades.deployProxy(XAssetShareTokenFactory,
+            [xAssetData.name, xAssetData.ticker],
+            {kind: "uups"}) as XAssetShareToken;
+        await shareToken.deployed();
+        saveXAssetValue(xAssetData, 'XAssetShareToken', shareToken.address);
+        console.log("XAssetShareToken deployed to:", shareToken.address);
+    } else {
+        console.log("XAssetShareToken already deployed");
+        shareToken = XAssetShareTokenFactory.attach(getXAssetValue(xAssetData, 'XAssetShareToken')) as XAssetShareToken;
+    }
 
-    saveValue('XAsset-'+xasset.address, {
-        'FarmConfigSet': farmXYZConfigSet.address,
-        'FarmFixedRiskWallet': farmXYZFarm.address,
-        'FarmXYZPlatformBridge': bridge.address,
-        'FarmXYZStrategy': strategy.address,
-        'XAssetBase': xasset.address,
-        'XAssetShareToken': shareToken.address,
-    });
+    let xasset:XAssetBase;
+    if (resume && getXAssetValue(xAssetData, 'XAssetBase') == null) {
+        console.log("Deploying XAssetBase...");
+        xasset = await upgrades.deployProxy(XAssetBaseFactory,
+            [xAssetData.ticker, usdcToken.address, shareToken.address],
+            {kind: "uups"}) as XAssetBase;
+        await xasset.deployed();
+        saveXAssetValue(xAssetData, 'XAssetBase', xasset.address);
+        console.log("XAssetBase deployed to:", xasset.address);
+    } else {
+        console.log("XAssetBase already deployed");
+        xasset = XAssetBaseFactory.attach(getXAssetValue(xAssetData, 'XAssetBase')) as XAssetBase;
+    }
+
+    if (resume && getXAssetValue(xAssetData, 'XAssetBaseSetup') == null) {
+        console.log("Setting up XAssetBase...");
+        console.log("Share token xasset: ", (await shareToken.xAsset()).toString());
+        if ((await shareToken.xAsset()).toString()=='0x0000000000000000000000000000000000000000') {
+            await shareToken.setXAsset(xasset.address);
+            await xasset.setStrategy(strategy.address);
+        }
+        let initialInvestmentSum = parseUnits("10", await usdcToken.decimals());
+        if ((await usdcToken.balanceOf(xasset.address)).lt(initialInvestmentSum) ) {
+            console.log("Transferring initial investment sum to XAssetBase...");
+            await usdcToken.transfer(xasset.address, initialInvestmentSum);
+            console.log("Balance of xasset after transfer: ", (await usdcToken.balanceOf(xasset.address)).toString());
+        } else {
+            console.log("Initial investment sum already transferred to XAssetBase");
+        }
+        await xasset.executeInitialInvestment();
+        saveXAssetValue(xAssetData, 'XAssetBaseSetup', true);
+        console.log("XAssetBase setup complete");
+    } else {
+        console.log("XAssetBase already setup");
+    }
+
+    // saveValue('XAsset-'+xAssetData.ticker, {
+    //     'FarmConfigSet': farmXYZConfigSet.address,
+    //     'FarmFixedRiskWallet': farmXYZFarm.address,
+    //     'FarmFixedRiskWalletSetup': true,
+    //     'FarmXYZPlatformBridge': bridge.address,
+    //     'FarmXYZStrategy': strategy.address,
+    //     'FarmXYZStrategyWhitelisted': true,
+    //     'XAssetBase': xasset.address,
+    //     'XAssetBaseSetup': true,
+    //     'XAssetShareToken': shareToken.address,
+    // });
 
     console.log("USDC Token deployed to:", usdcToken.address);
     console.log("FarmFixedRiskWallet deployed to:", farmXYZFarm.address);
     console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
     console.log("FarmXYZStrategy deployed to:", strategy.address);
     console.log("XAssetBase deployed to:", xasset.address);
+
+    console.groupEnd();
 }
 
 async function main() {
     readConfig();
 
-    const [ owner ] = await ethers.getSigners();
+    console.log("Deploying to network: ", hre.network.name);
 
-    const TestTokenFactory = await ethers.getContractFactory("TestToken");
-    let usdcToken;
-    if (hre.network.name == "mumbai") {
-        usdcToken = await TestTokenFactory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
-    } else {
-        console.log("Deploying TestUSDC...");
-        usdcToken = await TestTokenFactory.deploy("Test: USDC Coin", "USDC");
-        await usdcToken.deployed();
-        console.log("TestUSDC deployed to:", usdcToken.address);
-
-        console.log("Minting some TestUSDC...");
-        await usdcToken.mint(owner.address, parseUnits("1000000000", await usdcToken.decimals()));
+    if (hre.network.name == 'hardhat') {
+        config[hre.network.name] = config['polygon'];
     }
 
-    saveValue('USDCToken', usdcToken.address);
+    const [ owner ] = await ethers.getSigners();
 
-    // Now that all those are done let's initialize the macros contract
-    console.log("Deploying XAssetMacros...");
-    const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
-    const xassetMacros = await XAssetMacros.deploy();
-    await xassetMacros.deployed();
-    saveValue('XAssetMacros', xassetMacros.address);
-    console.log("XAssetMacros deployed to:", xassetMacros.address);
+    const ERC20Factory = await ethers.getContractFactory("ERC20");
+    for(let [key, token] of Object.entries(stableCoins[hre.network.name])) {
+        stableCoins[hre.network.name][key].contract = ERC20Factory.attach(token.address);
+    }
 
+    // <editor-fold desc="// Deploy Test Token">
+    // if (false) { // Deploy a test token to be used as stableCoin
+    //     console.log("Deploying TestUSDC...");
+    //     const TestTokenFactory = await ethers.getContractFactory("TestToken");
+    //     usdcToken = await TestTokenFactory.deploy("Test: USDC Coin", "USDC");
+    //     await usdcToken.deployed();
+    //     console.log("TestUSDC deployed to:", usdcToken.address);
+    //
+    //     console.log("Minting some TestUSDC...");
+    //     await usdcToken.mint(owner.address, parseUnits("1000000000", await usdcToken.decimals()));
+    // }
+    // </editor-fold>
+
+    let xassetMacros;
+    const XAssetMacrosFactory = await ethers.getContractFactory("XAssetMacros");
+
+    if (getValue('XAssetMacros') == null) {
+        // Now that all those are done let's initialize the macros contract
+        console.log("Deploying XAssetMacros...");
+        xassetMacros = await XAssetMacrosFactory.deploy();
+        await xassetMacros.deployed();
+        saveValue('XAssetMacros', xassetMacros.address);
+        console.log("XAssetMacros deployed to:", xassetMacros.address);
+    } else {
+        console.log("XAssetMacros already deployed");
+        xassetMacros = XAssetMacrosFactory.attach(getValue('XAssetMacros'));
+    }
+
+    let farmXYZConfigSet;
     const FarmConfigSetFactory = await ethers.getContractFactory("FarmConfigSet");
-    const farmXYZConfigSetProxy = await upgrades.deployProxy(FarmConfigSetFactory,
-        [],
-        {kind: "uups"});
-    let farmXYZConfigSet = farmXYZConfigSetProxy as FarmConfigSet;
-    await farmXYZConfigSet.deployed();
-    saveValue('FarmConfigSet', farmXYZConfigSet.address);
-    console.log("FarmConfigSet deployed to:", farmXYZConfigSet.address);
+    if (getValue('FarmConfigSet') == null) {
+        console.log("Deploying FarmConfigSet...");
+        const farmXYZConfigSetProxy = await upgrades.deployProxy(FarmConfigSetFactory,
+            [],
+            {kind: "uups"});
+        farmXYZConfigSet = farmXYZConfigSetProxy as FarmConfigSet;
+        await farmXYZConfigSet.deployed();
+        saveValue('FarmConfigSet', farmXYZConfigSet.address);
+        console.log("FarmConfigSet deployed to:", farmXYZConfigSet.address);
+    } else {
+        console.log("FarmConfigSet already deployed");
+        farmXYZConfigSet = FarmConfigSetFactory.attach(getValue('FarmConfigSet'));
+    }
 
     let xAssetsData = [
         {
-            name: "X-USDC Test XAsset 1",
-            ticker: "X-USDC-1",
-            rewardPool: parseUnits("300", await usdcToken.decimals()),
-            returnsPeriod: BigNumber.from(62*24*3600)
+            name: "X-USDC",
+            ticker: "X-USDC",
+            stableCoin: stableCoins[hre.network.name].USDC.contract,
+            rewardPool: parseUnits("100", await stableCoins[hre.network.name].USDC.contract.decimals()),
+            returnsPeriod: BigNumber.from(31*24*3600)
         },
         {
-            name: "X-USDC Test XAsset 2",
-            ticker: "X-USDC-2",
-            rewardPool: parseUnits("200", await usdcToken.decimals()),
-            returnsPeriod: BigNumber.from(65*24*3600)
+            name: "X-USDT",
+            ticker: "X-USDT",
+            stableCoin: stableCoins[hre.network.name].USDT.contract,
+            rewardPool: parseUnits("100", await stableCoins[hre.network.name].USDT.contract.decimals()),
+            returnsPeriod: BigNumber.from(30*24*3600)
         },
         {
-            name: "X-USDC Test XAsset 3",
-            ticker: "X-USDC-3",
-            rewardPool: parseUnits("400", await usdcToken.decimals()),
-            returnsPeriod: BigNumber.from(51*24*3600)
+            name: "X-DAI",
+            ticker: "X-DAI",
+            stableCoin: stableCoins[hre.network.name].DAI.contract,
+            rewardPool: parseUnits("100", await stableCoins[hre.network.name].DAI.contract.decimals()),
+            returnsPeriod: BigNumber.from(37*24*3600)
+        },
+        {
+            name: "X-FRAX",
+            ticker: "X-FRAX",
+            stableCoin: stableCoins[hre.network.name].FRAX.contract,
+            rewardPool: parseUnits("100", await stableCoins[hre.network.name].FRAX.contract.decimals()),
+            returnsPeriod: BigNumber.from(45*24*3600)
         }
     ];
 
     for (let i = 0; i < xAssetsData.length; i++) {
-        await deployXAsset(xAssetsData[i], usdcToken, farmXYZConfigSet);
+        await deployXAsset(xAssetsData[i], farmXYZConfigSet, true);
     }
 
 }

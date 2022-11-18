@@ -19,15 +19,6 @@
       "XAssetBase": "0x89f381a066707E564ef8947869816E8b7939642a",
       "XAssetShareToken": "0x9e6f094D9ebC23516cb48860379D182b3F321C08"
     },
-    "latest_ticker": "X-USDC-3",
-    "latest_FarmFixedRiskWallet": "0x0Fd8eff3e24128C89B94dEb53Cd0Fa34Ee57C81c",
-    "latest_FarmFixedRiskWalletSetup": true,
-    "latest_FarmXYZPlatformBridge": "0x02Fd39654dE7ABaC069856EB650C90121891D445",
-    "latest_FarmXYZStrategy": "0x88ecEaA528cfC45f66F8fEbf6995B921D19D27eC",
-    "latest_FarmXYZStrategyWhitelisted": true,
-    "latest_XAssetShareToken": "0xBe32b6A23022605c648A409bD3944663ed7E510c",
-    "latest_XAssetBase": "0x056434C0e4779FA92ad951b8549b93D9E8FeAF30",
-    "latest_XAssetBaseSetup": true,
     "XAsset-0x056434C0e4779FA92ad951b8549b93D9E8FeAF30": {
       "FarmConfigSet": "0x0F61636205F38df2C038b73e5AE4F2BdfE7334b2",
       "FarmFixedRiskWallet": "0x0Fd8eff3e24128C89B94dEb53Cd0Fa34Ee57C81c",
@@ -35,6 +26,98 @@
       "FarmXYZStrategy": "0x88ecEaA528cfC45f66F8fEbf6995B921D19D27eC",
       "XAssetBase": "0x056434C0e4779FA92ad951b8549b93D9E8FeAF30",
       "XAssetShareToken": "0xBe32b6A23022605c648A409bD3944663ed7E510c"
+    }
+  },
+  "hardhat": {
+    "XAssetMacros": "0x685e5f01b347C4D6354DC1A7D0f55f5f079E5A07",
+    "FarmConfigSet": "0xF10866bc2BE5f7022fA45eC0984C2496991fCcD2",
+    "XAsset-X-USDC": {
+      "FarmConfigSet": "0xF10866bc2BE5f7022fA45eC0984C2496991fCcD2",
+      "FarmFixedRiskWallet": "0x89aD06d53562C7d326D16C9Af1846A24d2e31d90",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0xfD215a42f3592D75b51099a391E5f6a09615198a",
+      "FarmXYZStrategy": "0x79B2b3Ebf058918794017a3e028EdD6E6d64cDAC",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetBase": "0xc5C4daA3dd797B28f2f5Cb51C99F96A08bCe9385",
+      "XAssetShareToken": "0xBd17270dFeE382f80c40a9913655c81918af9052",
+      "XAssetBaseSetup": true
+    },
+    "latest_ticker": "X-FRAX",
+    "XAsset-X-USDT": {
+      "FarmFixedRiskWallet": "0x9f47b8586F468A00113AC0893B0fDB5e5C2D29Bc",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0x060DB9874F670bb1F1Aa3893F68Cf7c3c89f9238",
+      "FarmXYZStrategy": "0xC7cBbD17DDa028B7C53B4e25671b06ebECf0418d",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0x7a6606453D24229931070e00886382F47bD84f9D",
+      "XAssetBase": "0xB3F372De197756dCC0f623080c8420b8bA8199FD",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X-DAI": {
+      "FarmFixedRiskWallet": "0x890f4F35D5916038E7cc9494319E011F2Bf3FC69",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0xeb936234b7ba8317cF9d0f8a96624A54307ADCbE",
+      "FarmXYZStrategy": "0x20E3FC185d7B1c404971468F70981a38fC5c7E5e",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0xcb398dC2De48716448152A228d49EFb4eee1A488",
+      "XAssetBase": "0xCAcFEAbCa8B60B93b7C8dBDD317781F947FF7260",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X-FRAX": {
+      "FarmFixedRiskWallet": "0x173FA1d0D04611F2BCee90Ac230db811d4265142",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0x8bE8bb82598da00f867925844516A31DEd1070ba",
+      "FarmXYZStrategy": "0xFD8d052A2Ffa476e3239521383992856B4f912BD",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0x0416fD0A193b5a0BE3d26e733039A85c21B58637",
+      "XAssetBase": "0x5177135dD9215088b7C7fa866d60c20C604adD8a",
+      "XAssetBaseSetup": true
+    }
+  },
+  "polygon": {
+    "XAssetMacros": "0x685e5f01b347C4D6354DC1A7D0f55f5f079E5A07",
+    "FarmConfigSet": "0xF10866bc2BE5f7022fA45eC0984C2496991fCcD2",
+    "XAsset-X-USDC": {
+      "FarmConfigSet": "0xF10866bc2BE5f7022fA45eC0984C2496991fCcD2",
+      "FarmFixedRiskWallet": "0x89aD06d53562C7d326D16C9Af1846A24d2e31d90",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0xfD215a42f3592D75b51099a391E5f6a09615198a",
+      "FarmXYZStrategy": "0x79B2b3Ebf058918794017a3e028EdD6E6d64cDAC",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetBase": "0xc5C4daA3dd797B28f2f5Cb51C99F96A08bCe9385",
+      "XAssetShareToken": "0xBd17270dFeE382f80c40a9913655c81918af9052",
+      "XAssetBaseSetup": true
+    },
+    "latest_ticker": "X-FRAX",
+    "XAsset-X-USDT": {
+      "FarmFixedRiskWallet": "0x6000b427961B23a2bfe79E5a9A25e1E2A027652F",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0xc8877d338f927dD99653B4177A16F51510dbC509",
+      "FarmXYZStrategy": "0xC2f29a1DA1AC3730B48f33c6ccD98867801F2Aa4",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0x926ff46b16a8a8216f1Cfe3c1E74a8dAa6E87670",
+      "XAssetBase": "0xC7cBbD17DDa028B7C53B4e25671b06ebECf0418d",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X-DAI": {
+      "FarmFixedRiskWallet": "0xB3F372De197756dCC0f623080c8420b8bA8199FD",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0x890f4F35D5916038E7cc9494319E011F2Bf3FC69",
+      "FarmXYZStrategy": "0xB5A91635C940B4FD419392A3BD37E78235f7bE29",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0x6972e012E02CB47F52CCd80FdDc7f4f040EFAC14",
+      "XAssetBase": "0x2cC79880966c54bC9c591a46A21a142b1f29EDE9",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X-FRAX": {
+      "FarmFixedRiskWallet": "0xCAcFEAbCa8B60B93b7C8dBDD317781F947FF7260",
+      "FarmFixedRiskWalletSetup": true,
+      "FarmXYZPlatformBridge": "0x173FA1d0D04611F2BCee90Ac230db811d4265142",
+      "FarmXYZStrategy": "0x3A4178B10632ee928C7827E46b56ef12582EE68F",
+      "FarmXYZStrategyWhitelisted": true,
+      "XAssetShareToken": "0x873B9dc2e8Ef20ab2120c7A8AFB5c7Eed1520947",
+      "XAssetBase": "0x34675eEB269E85Aea7CDc28C65859B26095DA2D0",
+      "XAssetBaseSetup": true
     }
   }
 }
