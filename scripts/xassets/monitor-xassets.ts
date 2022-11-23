@@ -19,9 +19,12 @@ import setLogFunction = firestore.setLogFunction;
 import {XAssetModel} from "../utils/XAsset";
 import {FarmXYZTools} from "../utils/FarmXYZTools";
 
-const BASE_URL = 'https://farm-xyz-backend.master.d.com.ro';
+const BASE_URL = 'https://farm-xyz.uc.r.appspot.com';
 
 const contracts: { [key: string]: { [key: string]: string } } = {
+    polygon: {
+        // usdc:
+    },
     mumbai: {
         usdc: "0x85111aF7Af9d768D928d8E0f893E793625C00bd1",
         farmFixedRiskWallet: "0x3A4178B10632ee928C7827E46b56ef12582EE68F",
@@ -153,13 +156,12 @@ let xAssetCollection: firestore.CollectionReference<XAsset>;
 let xAssetCharts: { [key: string]: { [key: string]: { [key: string]: any } } } = {};
 
 async function initialize() {
-    const serviceAccount = JSON.parse(readFileSync(".firebase-admin-key.json").toString());
+    const serviceAccount = JSON.parse(readFileSync(".firebase-admin-prod-key.json").toString());
 
     // setLogFunction(console.log);
 
     app = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: "https://farm-xyz-d93ea-default-rtdb.firebaseio.com"
+        credential: admin.credential.cert(serviceAccount)
     });
 
 
@@ -186,7 +188,10 @@ async function getXAssetPriceHistory(xAsset: XAsset, interval: string, limit: nu
                 limit: limit
             }
         });
-    return chartResponse.data.data[interval];
+    if (chartResponse.data.data) {
+        return chartResponse.data.data[interval];
+    }
+    return [];
 }
 
 async function updateXAssetFirebaseChartData(batch: Batch, xAsset: XAsset, interval: string, candles: any[]) {
