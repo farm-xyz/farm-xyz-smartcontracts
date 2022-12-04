@@ -56,6 +56,7 @@
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
     "monitor": "npx hardhat run --network polygon scripts/xassets/monitor-xassets.ts",
+    "monitor-bsc": "npx hardhat run --network bsc scripts/xassets/monitor-xassets.ts",
     "manage-xasset-price": "npx hardhat run --network polygon scripts/xassets/manage-xasset-price.ts",
     "generate-xasset-price-history": "npx hardhat run --network mumbai scripts/xassets/generate-xasset-price.ts"
   },
