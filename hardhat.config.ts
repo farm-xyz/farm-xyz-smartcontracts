@@ -39,7 +39,10 @@ const { ETH_MAINNET_RPC_PROVIDER,
         POLYGONSCAN_API_KEY,
         TEST_ACCOUNT2_PRIVATE_KEY,
         TEST_ACCOUNT3_PRIVATE_KEY,
-        FARM_XYZ_POOLS_CONTROL_KEY} = process.env;
+        FARM_XYZ_POOLS_CONTROL_KEY,
+        BSC_MAINNET_RPC_PROVIDER,
+        BSC_TESTNET_RPC_PROVIDER,
+        BSC_PRIVATE_KEY} = process.env;
 
 
 const config: HardhatUserConfig = {
@@ -50,8 +53,10 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: POLYGON_RPC_PROVIDER as string,
-        blockNumber: 35670775
+        url: BSC_MAINNET_RPC_PROVIDER as string,
+        blockNumber: 23595850,
+        // url: POLYGON_RPC_PROVIDER as string,
+        // blockNumber: 35670775
         // url: POLYGON_MUMBAI_RPC_PROVIDER as string,
         // blockNumber: 28895947
       },
@@ -85,6 +90,14 @@ const config: HardhatUserConfig = {
     mumbai: {
       url: POLYGON_MUMBAI_RPC_PROVIDER,
       accounts: [ `0x${POLYGON_PRIVATE_KEY}` ]
+    },
+    bsc: {
+        url: BSC_MAINNET_RPC_PROVIDER,
+        accounts: [ `0x${BSC_PRIVATE_KEY}` ]
+    },
+    bsc_testnet: {
+        url: BSC_TESTNET_RPC_PROVIDER,
+        accounts: [ `0x${BSC_PRIVATE_KEY}` ]
     }
   },
   gasReporter: {

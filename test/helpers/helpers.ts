@@ -41,6 +41,8 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
   let usdcToken:ERC20;
   let usdcTokenDecimals = 18;
   if (hre.network.name === "hardhat") {
+    /*
+    // This is used for the Polygon mumbai fork
     const TestTokenFactory = await ethers.getContractFactory("TestToken");
     const testToken = await TestTokenFactory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as TestToken;
     usdcToken = testToken;
@@ -48,14 +50,15 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
     await testToken.mint(owner.address, parseUnits("100000000", usdcTokenDecimals));
     await testToken.mint(john.address, parseUnits("100000000", usdcTokenDecimals));
     await testToken.mint(alice.address, parseUnits("100000000", usdcTokenDecimals));
+    */
 
-    /*
-    usdcToken = ERC20Factory.attach("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+    // This is used for the BSC mainnet fork
+    usdcToken = ERC20Factory.attach("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
     usdcTokenDecimals = await usdcToken.decimals();
-    await setTokenBalance("USDC", owner.address, parseUnits("102000000", usdcTokenDecimals));
-    await usdcToken.connect(owner).transfer(john.address,  parseUnits("1000000", usdcTokenDecimals));
-    await usdcToken.connect(owner).transfer(alice.address, parseUnits("1000000", usdcTokenDecimals));
-     */
+    // await setTokenBalance("USDC", owner.address, parseUnits("102000000", usdcTokenDecimals));
+    await usdcToken.connect(owner).transfer(john.address,  parseUnits("2", usdcTokenDecimals));
+    await usdcToken.connect(owner).transfer(alice.address, parseUnits("2", usdcTokenDecimals));
+
   } else if (hre.network.name == "mumbai") {
     usdcToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
     usdcTokenDecimals = await usdcToken.decimals();

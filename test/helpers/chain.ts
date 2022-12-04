@@ -32,7 +32,8 @@ export async function setTokenBalance(tokenName: string, wallet:string, newBalan
     const tokensMapping: { [key:string]: { [key: string]: { address: string; slot: number } }} = {
         "hardhat": {
             "USDC": {
-                address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+                address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+                // address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // Polygon
                 slot: 2
             },
             "DAI": {
@@ -159,4 +160,4 @@ function toBytes32(bn:BigNumber) {
 async function setStorageAt(address:string, index:string, value:string) {
     await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
     await ethers.provider.send("evm_mine", []); // Just mines to the next block
-};
+}

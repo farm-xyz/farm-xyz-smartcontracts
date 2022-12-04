@@ -12,7 +12,7 @@ export async function executeViaProxy(proxy:PRBProxy,
     const data: string = target.interface.encodeFunctionData(methodName, params);
 
     // let gasLimit = await target.estimateGas[methodName].apply(target, params.concat());
-    let gasLimit = BigNumber.from(1_000_000);
+    let gasLimit = BigNumber.from(3_000_000);
     // todo: find a way to estimate gas limit
 
     // Execute the composite call.

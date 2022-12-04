@@ -14,6 +14,7 @@ import "./IXAsset.sol";
 import "../strategies/IXStrategy.sol";
 import "./XAssetShareToken.sol";
 import "../farms/FarmXYZBase.sol";
+import "hardhat/console.sol";
 
 // todo #1: events
 // todo #2: bridge
@@ -204,15 +205,16 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ERC2771Recipient, UUPSUpgrad
 
         uint256 totalAssetValueAfterInvest = _strategy.getTotalAssetValue();
         uint256 totalAssetValueInvested = totalAssetValueAfterInvest - totalAssetValueBeforeInvest;
-//        console.log("[xasset][invest] totalAssetValueAfterInvest: %s", totalAssetValueAfterInvest);
+        console.log("[xasset][invest] totalAssetValueAfterInvest: %s", totalAssetValueAfterInvest);
 
         newShares =
         (totalAssetValueInvested * _shareTokenDenominator) /
         pricePerShareBeforeInvest;
+        console.log("[xasset][invest] newShares: %s", newShares);
         _shareToken.mint(_msgSender(), newShares);
         uint256 pricePerShareAfterInvest = this.getSharePrice();
-//        console.log("[xasset][invest] pricePerShareBeforeInvest", pricePerShareBeforeInvest);
-//        console.log("[xasset][invest] pricePerShareAfterInvest", pricePerShareAfterInvest);
+        console.log("[xasset][invest] pricePerShareBeforeInvest", pricePerShareBeforeInvest);
+        console.log("[xasset][invest] pricePerShareAfterInvest", pricePerShareAfterInvest);
         _checkPriceDifference(
             pricePerShareBeforeInvest,
             pricePerShareAfterInvest
