@@ -22,9 +22,9 @@ import {FarmXYZTools} from "../utils/FarmXYZTools";
 const BASE_URL = 'https://farm-xyz.uc.r.appspot.com';
 
 const contracts: { [key: string]: { [key: string]: string } } = {
-    polygon: {
-        // usdc:
-    },
+    polygon: {},
+    bsc: {},
+    bsc_testnet: {},
     mumbai: {
         usdc: "0x85111aF7Af9d768D928d8E0f893E793625C00bd1",
         farmFixedRiskWallet: "0x3A4178B10632ee928C7827E46b56ef12582EE68F",
