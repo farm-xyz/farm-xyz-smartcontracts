@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -7,45 +7,41 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@opengsn/contracts/src/ERC2771Recipient.sol";
 import "../xassets/IXAsset.sol";
 import "./IXAssetMacros.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract XAssetMacros is Ownable, IXAssetMacros {
+    using SafeERC20 for IERC20;
 
-    uint256 constant MAX_INT = 2 ** 256 - 1;
-
-    function macroTest(
+    function investIntoXAsset(
         address xAsset,
         address token,
         uint256 amount
-    //        int slippage
-    ) external returns (uint256) {
-        return 1;
-    }
-
-
-    function investIntoXAsset(
-        IXAsset xAsset,
-        IERC20 token,
-        uint256 amount
-    //        int slippage
     ) override external returns (uint256) {
-        if (token.allowance(_msgSender(), address(this)) < amount) {
-            token.approve(address(this), MAX_INT);
+        // Transfer tokens from the user to the proxy
+        IERC20(token).safeTransferFrom(_msgSender(), address(this), amount);
+
+        // Allow the xAsset to spend the tokens
+        if (IERC20(token).allowance(address(this), xAsset) < amount) {
+            IERC20(token).safeIncreaseAllowance(xAsset, type(uint256).max);
         }
-        require(token.transferFrom(_msgSender(), address(this), amount));
-        if (token.allowance(address(this), address(xAsset)) < amount) {
-            token.approve(address(xAsset), MAX_INT);
-        }
-        uint256 shares = xAsset.invest(IERC20Metadata(address(token)), amount);
-//        require(IXAsset(xAsset).getBaseToken().transfer(msg.sender, baseTokenAmount), "ERC20: transfer failed");
-        require(xAsset.shareToken().transfer(_msgSender(), shares), "ERC20: transfer failed");
+
+        // Invest the tokens into the xAsset
+        uint256 shares = IXAsset(xAsset).invest(token, amount);
+
+        // Transfer the shares to the user's wallet
+        IERC20(IXAsset(xAsset).shareToken()).safeTransfer(_msgSender(), shares);
         return shares;
     }
 
     function withdrawFromXAsset(
-        IXAsset xAsset,
+        address xAsset,
         uint256 shares
     ) override external returns (uint256) {
-        uint256 baseTokenAmount = xAsset.withdrawFrom(_msgSender(), shares);
+        // We don't need to transfer the shares to the proxy because the xAsset
+        // will burn them directly and check the right balance
+        uint256 baseTokenAmount = IXAsset(xAsset).withdrawFrom(_msgSender(), shares);
+        // We don't need to transfer tokens to the owner because the xAsset
+        // will send them directly to the owner
         return baseTokenAmount;
     }
 

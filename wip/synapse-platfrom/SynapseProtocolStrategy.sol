@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -53,6 +53,7 @@ contract SynapseProtocolStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradea
         IERC20Metadata baseToken_) initializer external {
         console.log("---- [SynapseProtocolStrategy.initialize]");
         __UUPSUpgradeable_init();
+        __Ownable_init();
 
         name = "SynapseProtocolStrategy";
         // todo: add xAsset, pool param, add baseToken, assets to convert to

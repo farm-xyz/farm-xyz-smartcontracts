@@ -46,7 +46,7 @@
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
     "prompt-confirm": "^2.0.4",
-    "solhint": "^3.3.6",
+    "solhint": "^3.3.7",
     "solidity-coverage": "^0.7.17",
     "ts-node": "^10.4.0",
     "typechain": "^5.2.0",
@@ -55,6 +55,8 @@
   "scripts": {
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "slither": "slither . --filter-paths \"node_modules\"",
     "monitor": "npx hardhat run --network polygon scripts/xassets/monitor-xassets.ts",
     "monitor-bsc": "npx hardhat run --network bsc scripts/xassets/monitor-xassets.ts",
     "manage-xasset-price": "npx hardhat run --network polygon scripts/xassets/manage-xasset-price.ts",

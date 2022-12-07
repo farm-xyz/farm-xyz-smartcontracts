@@ -1,0 +1,30 @@
+{
+  "bsc": {
+    "XAssetMacros": "0xF10866bc2BE5f7022fA45eC0984C2496991fCcD2",
+    "latest_ticker": "X[MGP]-USDC",
+    "XAsset-X[MGP]-BUSD": {
+      "MagpieStrategy": "0x89aD06d53562C7d326D16C9Af1846A24d2e31d90",
+      "XAssetShareToken": "0xdCf96D8B62202b7016DCb6B70177A12bA39A9946",
+      "XAssetBase": "0xfD215a42f3592D75b51099a391E5f6a09615198a",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X[MGP]-USDT": {
+      "MagpieStrategy": "0x664831F38C019E0F01fB20261A5f76861E0afA29",
+      "XAssetShareToken": "0x97b8Ece7516b74AeE903DBae3b93ca5aA3828411",
+      "XAssetBase": "0x6000b427961B23a2bfe79E5a9A25e1E2A027652F",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X[MGP]-DAI": {
+      "MagpieStrategy": "0xc8877d338f927dD99653B4177A16F51510dbC509",
+      "XAssetShareToken": "0xC2f29a1DA1AC3730B48f33c6ccD98867801F2Aa4",
+      "XAssetBase": "0x060DB9874F670bb1F1Aa3893F68Cf7c3c89f9238",
+      "XAssetBaseSetup": true
+    },
+    "XAsset-X[MGP]-USDC": {
+      "MagpieStrategy": "0x7a6606453D24229931070e00886382F47bD84f9D",
+      "XAssetShareToken": "0xDC35cAF9839Cb90A8ffd839eb208427b3b14C22a",
+      "XAssetBase": "0xB3F372De197756dCC0f623080c8420b8bA8199FD",
+      "XAssetBaseSetup": true
+    }
+  }
+}

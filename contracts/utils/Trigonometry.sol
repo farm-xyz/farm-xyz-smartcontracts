@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD3
 /**
  * Basic trigonometry functions
  *
@@ -18,8 +19,7 @@
  * @author Lefteris Karapetsas
  * @license BSD3
  */
-
-pragma solidity 0.8.4;
+pragma solidity ^0.8.0;
 
 library Trigonometry {
 

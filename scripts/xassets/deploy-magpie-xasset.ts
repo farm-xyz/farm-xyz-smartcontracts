@@ -180,7 +180,12 @@ async function deployMagpieXAsset(xAssetData: { name: string, ticker: string, st
     if (resume && getXAssetValue(xAssetData, 'MagpieStrategy') == null) {
         console.log("Deploying MagpieStrategy...");
         strategy = await upgrades.deployProxy(MagpieStrategyFactory,
-            [usdcToken.address, xAssetData.magpieHelper],
+            [
+                usdcToken.address, // baseToken
+                xAssetData.magpieHelper, // magpieHelper
+                "0x312Bc7eAAF93f1C60Dc5AfC115FcCDE161055fb0", // magpiePool
+                "0xAD6742A35fB341A9Cc6ad674738Dd8da98b94Fb1" // womToken
+            ],
             {kind: "uups"});
         await strategy.deployed();
         saveXAssetValue(xAssetData, 'MagpieStrategy', strategy.address);
@@ -194,7 +199,7 @@ async function deployMagpieXAsset(xAssetData: { name: string, ticker: string, st
     if (resume && getXAssetValue(xAssetData, 'XAssetShareToken') == null) {
         console.log("Deploying XAssetShareToken...");
         shareToken = await upgrades.deployProxy(XAssetShareTokenFactory,
-            [xAssetData.name, xAssetData.ticker],
+            [xAssetData.name, xAssetData.ticker, "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
             {kind: "uups"}) as XAssetShareToken;
         await shareToken.deployed();
         saveXAssetValue(xAssetData, 'XAssetShareToken', shareToken.address);
@@ -208,7 +213,7 @@ async function deployMagpieXAsset(xAssetData: { name: string, ticker: string, st
     if (resume && getXAssetValue(xAssetData, 'XAssetBase') == null) {
         console.log("Deploying XAssetBase...");
         xasset = await upgrades.deployProxy(XAssetBaseFactory,
-            [xAssetData.ticker, usdcToken.address, shareToken.address],
+            [xAssetData.ticker, usdcToken.address, shareToken.address, "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
             {kind: "uups"}) as XAssetBase;
         await xasset.deployed();
         saveXAssetValue(xAssetData, 'XAssetBase', xasset.address);

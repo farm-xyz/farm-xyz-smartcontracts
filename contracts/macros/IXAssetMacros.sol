@@ -1,4 +1,5 @@
-pragma solidity 0.8.4;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../xassets/IXAsset.sol";
@@ -6,13 +7,13 @@ import "../xassets/IXAsset.sol";
 
 interface IXAssetMacros {
     function investIntoXAsset(
-        IXAsset xAsset,
-        IERC20 token,
+        address xAsset,
+        address token,
         uint256 amount
     ) external returns (uint256);
 
     function withdrawFromXAsset(
-        IXAsset xAsset,
+        address xAsset,
         uint256 shares
     ) external returns (uint256);
 }

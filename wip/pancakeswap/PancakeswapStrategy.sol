@@ -40,6 +40,7 @@ contract PancakeswapStrategy is IXStrategy, OwnableUpgradeable, UUPSUpgradeable 
                         IERC20Metadata tokenB,
                         IERC20Metadata cakeToken) initializer external {
         __UUPSUpgradeable_init();
+        __Ownable_init();
 
         name = "PancakeswapStrategy";
 

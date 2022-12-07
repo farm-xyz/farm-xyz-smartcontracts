@@ -138,12 +138,17 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
         // Then let's initialize the reward farm
 
-        let strategy;
+        let strategy: MagpieStrategy;
 
         if (forceRedeploy || !config['MagpieStrategy']) {
             strategy = await upgrades.deployProxy(MagpieStrategyFactory,
-                [usdcToken.address, "0xb68F5247f31fe28FDe0b0F7543F635a4d6EDbD7F"], // Magpie USDC Helper
-                {kind: "uups"});
+                [
+                    usdcToken.address,
+                    "0xb68F5247f31fe28FDe0b0F7543F635a4d6EDbD7F", // Magpie USDC Helper
+                    "0x312Bc7eAAF93f1C60Dc5AfC115FcCDE161055fb0", // WombatPool
+                    "0xAD6742A35fB341A9Cc6ad674738Dd8da98b94Fb1" // womToken
+                ],
+                {kind: "uups"}) as MagpieStrategy;
             await strategy.deployed();
             config['MagpieStrategy'] = strategy.address;
             saveConfig();
@@ -155,7 +160,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         let _shareToken;
         if (forceRedeploy || !config['XAssetShareToken']) {
             _shareToken = await upgrades.deployProxy(XAssetShareToken,
-                ["X-MAGPIE-USDC XASSET", "X-USDC"],
+                ["X-MAGPIE-USDC XASSET", "X-USDC", "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
                 {kind: "uups"});
             await _shareToken.deployed();
             config['XAssetShareToken'] = _shareToken.address;
@@ -171,7 +176,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         let xassetProxy;
         if (forceRedeploy || !config['XAssetBase']) {
             xassetProxy = await upgrades.deployProxy(XAssetBase,
-                ["X-USDC", usdcToken.address, _shareToken.address],
+                ["X-USDC", usdcToken.address, _shareToken.address, "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
                 {kind: "uups"});
             await xassetProxy.deployed();
             config['XAssetBase'] = xassetProxy.address;
@@ -298,6 +303,8 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
             const sharesBefore = await shareToken.totalSupply();
             await invest(owner, usdc("2"));
             const sharesAfter = await shareToken.totalSupply();
+            const valueAfter = await xAsset.getTotalValueOwnedBy(owner.address);
+            console.log('valueAfter', web3.utils.fromWei(valueAfter.toString()));
 
             expect(sharesAfter).to.greaterThan(sharesBefore);
         })
@@ -422,7 +429,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
         })
 
-        it('should allow multiple users to invest and withdraw at anytime', async () => {
+        it.only('should allow multiple users to invest and withdraw at anytime', async () => {
             // invest 100 tokens
             const amount = usdc("1");
             await invest(john, amount);
@@ -437,7 +444,13 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
             await time.increase(24*3600);
 
+            let balanceBefore = await usdcToken.balanceOf(alice.address);
             await withdraw(alice, await xAsset.getTotalSharesOwnedBy(alice.address));
+            let balanceAfter = await usdcToken.balanceOf(alice.address);
+            console.log('alice balance before', web3.utils.fromWei(balanceBefore.toString()));
+            console.log('alice balance after', web3.utils.fromWei(balanceAfter.toString()));
+            console.log('alice balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
+            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
 
             await time.increase(24*3600);
 
@@ -447,8 +460,13 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
             await invest(owner, amount);
 
+            balanceBefore = await usdcToken.balanceOf(john.address);
+            console.log('john balance before', web3.utils.fromWei(balanceBefore.toString()));
             await withdrawHalfShares(john);
-
+            balanceAfter = await usdcToken.balanceOf(john.address);
+            console.log('john balance after', web3.utils.fromWei(balanceAfter.toString()));
+            console.log('john balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
+            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
         })
 
         it('should calculate the total value owned by an address', async () => {

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 interface IXAsset {
 
-    function getBaseToken() external view returns (IERC20Metadata);
+    function getBaseToken() external view returns (address);
 
     /**
      * @dev Invest an amount of X-BASE-TOKEN in different assets.
      */
-    function invest(IERC20Metadata token, uint256 amount)
+    function invest(address token, uint256 amount)
         external
         returns (uint256);
 
@@ -60,5 +60,5 @@ interface IXAsset {
     /**
      * @return The token that keeps track of the shares of this XASSET
      */
-    function shareToken() external view returns (IERC20MetadataUpgradeable);
+    function shareToken() external view returns (address);
 }
