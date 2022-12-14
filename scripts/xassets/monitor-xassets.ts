@@ -83,7 +83,7 @@ const xAssetFirebaseConverter: FirestoreDataConverter<XAsset> = {
         const data = snapshot.data()!;
         const ret = new XAsset(data.id, data.address);
         ret.name = data.name;
-        ret.change = data.change;
+        ret.percentage = data.percentage;
         ret.safetyScore = data.safetyScore;
         ret.realAPY = data.realAPY;
         ret.icon = data.icon;
@@ -102,7 +102,7 @@ const xAssetFirebaseConverter: FirestoreDataConverter<XAsset> = {
         return {
             id: modelObject.id,
             name: modelObject.name,
-            change: modelObject.change,
+            percentage: modelObject.percentage,
             safetyScore: modelObject.safetyScore,
             realAPY: modelObject.realAPY,
             icon: modelObject.icon,

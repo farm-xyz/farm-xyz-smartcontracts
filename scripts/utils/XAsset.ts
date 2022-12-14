@@ -5,7 +5,7 @@ type Constructor<T> = { new (): T }
 export class XAssetModel {
     id: string;
     name: string | undefined;
-    change: number | undefined;
+    percentage: number | undefined;
     safetyScore: number | undefined;
     realAPY: { realAPY1m: number, realAPY6m: number, realAPY3m: number } | undefined;
     icon: string | undefined;
@@ -27,7 +27,7 @@ export class XAssetModel {
     static fromDbData<T extends XAssetModel>(this: new (id: string, address: string) => T, data: any): T {
         let ret = new this(data.id, data.address);
         ret.name = data.name;
-        ret.change = data.percentage;
+        ret.percentage = data.percentage;
         ret.safetyScore = data.safetyScore;
         ret.realAPY = {
             realAPY1m: data.xassetAPY.realAPY1m,
