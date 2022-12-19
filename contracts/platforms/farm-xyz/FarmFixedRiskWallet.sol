@@ -107,7 +107,8 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
         _totalReturnsDeposited -=amount;
     }
 
-    function stake(uint256 amount) override external {
+    function stake(address token, uint256 amount) override external {
+        require(token == address(_token), "Can't stake: wrong token");
         require(amount > 0, "You cannot stake zero tokens");
         require(_token.balanceOf(msg.sender) >= amount, "Can't stake: You don't own enough tokens");
         require(!_isWhitelistOnly || _whitelist[msg.sender], "You are not whitelisted");
@@ -151,7 +152,8 @@ contract FarmFixedRiskWallet is OwnableUpgradeable, UUPSUpgradeable, IFarmXYZPoo
         emit Unstake(owner, balTransfer);
     }
 
-    function unstake(uint256 amount) override external {
+    function unstake(address token, uint256 amount) override external {
+        require(token == address(_token), "Can't unstake: wrong token");
         _unstake(msg.sender, amount);
     }
 

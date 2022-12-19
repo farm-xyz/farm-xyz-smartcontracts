@@ -128,6 +128,14 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ReentrancyGuardUpgradeable, 
     }
 
     function executeInitialInvestment() external onlyOwner {
+        _executeInitialInvestment(10, 1);
+    }
+
+    function executeInitialInvestment(uint256 amount, uint256 shares) external onlyOwner {
+        _executeInitialInvestment(amount, shares);
+    }
+
+    function _executeInitialInvestment(uint256 amount, uint256 shares) private {
         require(!initialInvestmentDone, "Initial investment is already done");
 
         uint256 totalAssetValueBeforeInvest = IXStrategy(strategy).getTotalAssetValue();
@@ -137,10 +145,9 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ReentrancyGuardUpgradeable, 
         );
 
         // We start with a share value of $10, and 1 share
-        uint256 amount = 10 * baseTokenDenominator;
         IERC20Upgradeable(baseToken).safeIncreaseAllowance(address(strategy), amount);
         IXStrategy(strategy).invest(baseToken, amount, 0);
-        XAssetShareToken(shareToken).mint(address(this), 1 * shareTokenDenominator);
+        XAssetShareToken(shareToken).mint(address(this), shares);
         initialInvestmentDone = true;
         emit Invest(address(this), amount);
         emit XAssetInitialized();
@@ -298,10 +305,10 @@ contract XAssetBase is IXAsset, OwnableUpgradeable, ReentrancyGuardUpgradeable, 
 
         IERC20Upgradeable(baseToken).safeTransfer(owner, withdrawn);
 
-//        _checkPriceDifference(
-//            pricePerShareBeforeWithdraw,
-//            pricePerShareAfterWithdraw
-//        );
+        _checkPriceDifference(
+            pricePerShareBeforeWithdraw,
+            pricePerShareAfterWithdraw
+        );
         emit Withdraw(owner, withdrawn);
         return withdrawn;
     }

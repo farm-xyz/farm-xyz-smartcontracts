@@ -58,10 +58,10 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
     ) nonReentrant whenNotPaused override external returns (uint256) {
         require(amount>=minAmount, "FarmXYZStrategy: amount is less than minAmount"); // silence unused param warning
         require(IERC20(token).transferFrom(msg.sender, address(this), amount), "ERC20: transferFrom failed");
-        if (_baseToken.allowance(address(this), address(_farm)) < amount) {
-            _baseToken.approve(address(_farm), amount);
+        if (IERC20(token).allowance(address(this), address(_farm)) < amount) {
+            IERC20(token).approve(address(_farm), amount);
         }
-        _farm.stake(amount);
+        _farm.stake(token, amount);
 
         return amount;
     }
@@ -71,7 +71,7 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
         uint256 minAmount
     ) nonReentrant whenNotPaused override external returns (uint256) {
         uint256 balanceBefore = IERC20(_baseToken).balanceOf(address(this));
-        _farm.unstake(amount);
+        _farm.unstake(address(_baseToken), amount);
         uint256 balanceAfter = IERC20(_baseToken).balanceOf(address(this));
         uint256 balance = balanceAfter - balanceBefore;
         require(balance >= minAmount, "FarmXYZStrategy: balance is less than minAmount");

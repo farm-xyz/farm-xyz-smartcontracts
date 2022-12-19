@@ -12,6 +12,7 @@ import "solidity-coverage";
 import 'hardhat-preprocessor';
 import {ethers} from "ethers";
 import {removeConsoleLog} from "hardhat-preprocessor";
+import 'hardhat-tracer';
 
 dotenv.config();
 
@@ -42,7 +43,8 @@ const { ETH_MAINNET_RPC_PROVIDER,
         FARM_XYZ_POOLS_CONTROL_KEY,
         BSC_MAINNET_RPC_PROVIDER,
         BSC_TESTNET_RPC_PROVIDER,
-        BSC_PRIVATE_KEY} = process.env;
+        BSC_PRIVATE_KEY,
+        BSCSCAN_API_KEY} = process.env;
 
 
 const config: HardhatUserConfig = {
@@ -50,11 +52,14 @@ const config: HardhatUserConfig = {
     version: "0.8.4",
     settings: { optimizer: { enabled: true, runs: 200, details: { yul: false }, }, }
   },
+  mocha: {
+    timeout: 100000000
+  },
   networks: {
     hardhat: {
       forking: {
         url: BSC_MAINNET_RPC_PROVIDER as string,
-        blockNumber: 23595850,
+        blockNumber: 23908558,
         // url: POLYGON_RPC_PROVIDER as string,
         // blockNumber: 35670775
         // url: POLYGON_MUMBAI_RPC_PROVIDER as string,
@@ -116,7 +121,8 @@ const config: HardhatUserConfig = {
     apiKey: {
       ropsten: ETH_ROPSTEN_ETHERSCAN_API_KEY as string,
       polygon: POLYGONSCAN_API_KEY as string,
-      polygonMumbai: POLYGONSCAN_API_KEY as string
+      polygonMumbai: POLYGONSCAN_API_KEY as string,
+      bsc: BSCSCAN_API_KEY as string,
     },
 
   },

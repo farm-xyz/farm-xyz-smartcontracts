@@ -1,32 +1,37 @@
 import {
     ERC20,
     FarmConfigSet,
-    FarmFixedRiskWallet,
+    FarmFixedRiskWallet, FarmInvestableWallet,
     FarmXYZPlatformBridge,
-    FarmXYZStrategy, MagpieStrategy,
+    FarmXYZStrategy,
     XAssetBase,
     XAssetMacros,
     XAssetShareToken
 } from "../../typechain";
 import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
-import {ethers, network, upgrades, web3} from "hardhat";
+import {ethers, upgrades, web3} from "hardhat";
 import {expect} from "chai";
 import {BigNumber} from "ethers";
 import {mine, time} from "@nomicfoundation/hardhat-network-helpers";
 import {getPRBProxyRegistry, PRBProxy, PRBProxyRegistry} from "@prb/proxy";
 import {executeViaProxy} from "../helpers/proxy";
 import "hardhat-gas-reporter"
-import {getProxyForSigner, initializeBaseWalletsAndTokens, setBaseWalletsAndTokens, usdc} from "../helpers/helpers";
+import {
+    baseWalletsAndTokens,
+    getProxyForSigner,
+    initializeBaseWalletsAndTokens,
+    setBaseWalletsAndTokens,
+    usdc, usdt
+} from "../helpers/helpers";
 import fs, {readFileSync} from "fs";
 import {parseUnits} from "ethers/lib/utils";
 // import {timeout} from "../helpers/utils";
-import hardhatConfig, {default as networkConfig} from "../../hardhat.config";
 import hre = require("hardhat");
 
 
-describe.only("MagpieXYZProtocol XAssets", async () => {
+describe.only("FarmXYZ Investments XAssets", async () => {
 
-    const forceRedeploy = false;
+    const forceRedeploy = true;
 
     let proxyRegistryAddress: string = "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63";
 
@@ -36,6 +41,8 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
     let shareToken: ERC20;
     let usdcToken: ERC20;
     let usdcTokenDecimals: number;
+    let usdtToken: ERC20;
+    let usdtTokenDecimals: number;
 
     let owner: SignerWithAddress;
     let john: SignerWithAddress;
@@ -53,30 +60,35 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         console.log("Sent tx hash: ", transaction.hash);
     }
 
-    async function invest(from: SignerWithAddress, amount:BigNumber) {
+    async function invest(from: SignerWithAddress, amount:BigNumber, token:string|null = null) {
+        if (!token) token = usdcToken.address;
+        // log the balance of the user
+        let balance = await usdcToken.balanceOf(from.address);
+        console.log("Invest ", amount, " Balance of ", from.address, " is ", balance.toString());
+        if (amount.gt(balance)) {
+            throw new Error("Invest: Not enough balance");
+        }
         let proxy = await getProxyForSigner(from);
+
         console.log('Invest via proxy: ', proxy.address);
-        const transaction = await executeViaProxy(proxy, from, xassetMacros, 'investIntoXAsset', [xAsset.address, usdcToken.address, amount]);
-        await transaction.wait();
-        console.log("Invest tx hash: ", transaction.hash);
-        console.log("Gas used: ", (await transaction.wait()).gasUsed);
-        expect(transaction).to.not.be.revertedWith('ERC20: transfer amount exceeds balance');
+        await expect(executeViaProxy(proxy, from, xassetMacros, 'investIntoXAsset', [xAsset.address, token, amount])).to.not.be.reverted;
     }
 
     async function withdraw(from: SignerWithAddress, shares:BigNumber) {
+        let ownedSharesBefore = await xAsset.getTotalSharesOwnedBy(from.address);
         let proxy = await getProxyForSigner(from);
-        const transaction = await executeViaProxy(proxy, from, xassetMacros, 'withdrawFromXAsset', [xAsset.address, shares]);
-        await transaction.wait();
-        console.log("Withdraw tx hash: ", transaction.hash);
-        console.log("Gas used: ", (await transaction.wait()).gasUsed);
-        expect(transaction).to.be.ok;
+        let tx = await expect(executeViaProxy(proxy, from, xassetMacros, 'withdrawFromXAsset', [xAsset.address, shares])).to.be.revertedWith("Unstake not allowed, all investments are final");
+        let ownedSharesAfter = await xAsset.getTotalSharesOwnedBy(from.address);
+        expect(ownedSharesBefore).to.be.eq(ownedSharesAfter);
+
+        return tx;
     }
 
     let config: { [key: string]: any } = {};
 
     function readConfig() {
         try {
-            let configJson = readFileSync('config.json', 'utf-8');
+            let configJson = readFileSync('config-farmx-invest.json', 'utf-8');
             config = JSON.parse(configJson);
         } catch (e) {
             config = {};
@@ -86,62 +98,94 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
     function saveConfig() {
         if (hre.network.name=== 'hardhat') return;
         let configJson = JSON.stringify(config);
-        fs.writeFileSync('config.json', configJson);
+        fs.writeFileSync('config-farmx-invest.json', configJson);
     }
 
     async function initialize() {
         readConfig();
-        console.log("Initializing contracts");
         let baseWalletsAndTokens = await initializeBaseWalletsAndTokens();
         usdcToken = baseWalletsAndTokens.usdcToken;
         usdcTokenDecimals = baseWalletsAndTokens.usdcTokenDecimals;
+        usdtToken = baseWalletsAndTokens.usdtToken;
+        usdtTokenDecimals = baseWalletsAndTokens.usdtTokenDecimals;
         owner = baseWalletsAndTokens.owner;
         john = baseWalletsAndTokens.john;
         alice = baseWalletsAndTokens.alice;
 
-        console.log("Reading proxy");
         ownerProxy = await getProxyForSigner(owner);
 
-        const MagpieStrategyFactory = await ethers.getContractFactory("MagpieStrategy");
+        const FarmInvestableWalletFactory = await ethers.getContractFactory("FarmInvestableWallet");
+        const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
+        const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
         const XAssetBase = await ethers.getContractFactory("XAssetBase");
         // const XAssetBaseV2 = await ethers.getContractFactory("XAssetBaseV2");
-        const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
+        const XAssetShareTokenFactory = await ethers.getContractFactory("XAssetShareToken");
         const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
 
 
         // Then let's initialize the reward farm
 
-        let strategy: MagpieStrategy;
-
-        if (forceRedeploy || !config['MagpieStrategy']) {
-            strategy = await upgrades.deployProxy(MagpieStrategyFactory,
-                [
-                    usdcToken.address,
-                    // "0x1aa1E18FAFAe4391FF33dFBE6198dc84B9541D77", // Magpie USDT Helper
-                    "0xb68F5247f31fe28FDe0b0F7543F635a4d6EDbD7F", // Magpie USDC Helper
-                    "0x312Bc7eAAF93f1C60Dc5AfC115FcCDE161055fb0", // WombatPool
-                    "0xAD6742A35fB341A9Cc6ad674738Dd8da98b94Fb1" // womToken
-                ],
-                {kind: "uups"}) as MagpieStrategy;
-            await strategy.deployed();
-            config['MagpieStrategy'] = strategy.address;
-            saveConfig();
-            console.log("MagpieStrategy deployed to:", strategy.address);
+        let farmXYZFarm;
+        if (!forceRedeploy && config['FarmInvestableWallet']) {
+            farmXYZFarm = FarmInvestableWalletFactory.attach(config['FarmInvestableWallet']) as FarmInvestableWallet;
         } else {
-            strategy = MagpieStrategyFactory.attach(config['MagpieStrategy']) as MagpieStrategy;
+            const farmXYZFarmProxy = await upgrades.deployProxy(FarmInvestableWalletFactory,
+                [ ],
+                {kind: "uups"});
+            farmXYZFarm = farmXYZFarmProxy as FarmInvestableWallet;
+            await farmXYZFarm.deployed();
+            config['FarmFixedRiskWallet'] = farmXYZFarm.address;
+            saveConfig();
+            console.log("FarmFixedRiskWallet deployed to:", farmXYZFarm.address);
+        }
+
+        if (forceRedeploy || !config['FarmInvestableWalletInitialised']) {
+            await farmXYZFarm.setWhitelistEnabled(true);
+            await farmXYZFarm.addToWhitelist([owner.address, john.address, alice.address]);
+            await farmXYZFarm.addToTokenWhitelist([usdcToken.address, usdtToken.address]);
+            config['FarmFixedRiskWalletInitialised'] = true;
+            saveConfig();
+        }
+
+        console.log("FarmInvestableWallet configured");
+
+        let bridge;
+        if (forceRedeploy || !config['FarmXYZPlatformBridge']) {
+            bridge = await upgrades.deployProxy(FarmXYZPlatformBridge, [], {kind: "uups"});
+            await bridge.deployed();
+            config['FarmXYZPlatformBridge'] = bridge.address;
+            saveConfig();
+            console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
+        } else {
+            bridge = FarmXYZPlatformBridge.attach(config['FarmXYZPlatformBridge']) as FarmXYZPlatformBridge;
+        }
+
+        let strategy;
+
+        if (forceRedeploy || !config['FarmXYZStrategy']) {
+            strategy = await upgrades.deployProxy(FarmXYZStrategy,
+                [bridge.address, farmXYZFarm.address, usdcToken.address],
+                {kind: "uups"});
+            await strategy.deployed();
+            config['FarmXYZStrategy'] = strategy.address;
+            await farmXYZFarm.addToWhitelist([ strategy.address ]);
+            saveConfig();
+            console.log("FarmXYZStrategy deployed to:", strategy.address);
+        } else {
+            strategy = FarmXYZStrategy.attach(config['FarmXYZStrategy']) as FarmXYZStrategy;
         }
 
         let _shareToken;
         if (forceRedeploy || !config['XAssetShareToken']) {
-            _shareToken = await upgrades.deployProxy(XAssetShareToken,
-                ["X-MAGPIE-USDC XASSET", "X-USDC", proxyRegistryAddress],
+            _shareToken = await upgrades.deployProxy(XAssetShareTokenFactory,
+                ["FARMX Seed Allocation XASSET", "FARMX-Seed", proxyRegistryAddress],
                 {kind: "uups"});
             await _shareToken.deployed();
             config['XAssetShareToken'] = _shareToken.address;
             saveConfig();
             console.log("XAssetShareToken deployed to:", _shareToken.address);
         } else {
-            _shareToken = XAssetShareToken.attach(config['XAssetShareToken']) as XAssetShareToken;
+            _shareToken = XAssetShareTokenFactory.attach(config['XAssetShareToken']) as XAssetShareToken;
         }
 
 
@@ -150,7 +194,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         let xassetProxy;
         if (forceRedeploy || !config['XAssetBase']) {
             xassetProxy = await upgrades.deployProxy(XAssetBase,
-                ["X-USDC", usdcToken.address, _shareToken.address, proxyRegistryAddress],
+                ["X-FARMX-SEED", usdcToken.address, _shareToken.address, proxyRegistryAddress],
                 {kind: "uups"});
             await xassetProxy.deployed();
             config['XAssetBase'] = xassetProxy.address;
@@ -158,7 +202,6 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
             console.log("XAssetBase deployed to:", xassetProxy.address);
         } else {
             xassetProxy = XAssetBase.attach(config['XAssetBase']) as XAssetBase;
-            console.log("XAssetBase attached to:", xassetProxy.address);
 
             if (config['upgrade'] && config['upgrade']['XAssetBase']) {
                 throw new Error("XAssetBase upgrade not implemented");
@@ -172,8 +215,9 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         if (forceRedeploy || !config['XAssetBaseInitialised']) {
             await _shareToken.setXAsset(xassetProxy.address);
             await (xassetProxy as XAssetBase).setStrategy(strategy.address);
-            await usdcToken.transfer(xassetProxy.address, usdc("10"));
-            await (xassetProxy as XAssetBase)["executeInitialInvestment()"]();
+            await (xassetProxy as XAssetBase).setAcceptedPriceDifference(100);
+            await usdcToken.transfer(xassetProxy.address, usdc("1"));
+            await (xassetProxy as XAssetBase)["executeInitialInvestment(uint256,uint256)"](usdc("0.121"), usdc("1"));
             config['XAssetBaseInitialised'] = true;
             saveConfig();
         }
@@ -194,16 +238,17 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
             console.log("Approving ownerProxy to spend USDC");
             await usdcToken.approve(ownerProxy.address, parseUnits("100000", usdcTokenDecimals));
         }
-        if (john && (await usdcToken.balanceOf(john.address)).lte(parseUnits("10", usdcTokenDecimals))) {
+        if ((await usdcToken.balanceOf(john.address)).lte(parseUnits("5", usdcTokenDecimals))) {
             console.log("Transferring USDC to John");
-            await usdcToken.transfer(john.address, parseUnits("10", usdcTokenDecimals));
+            await usdcToken.transfer(john.address, parseUnits("5", usdcTokenDecimals));
         }
-        if (alice && (await usdcToken.balanceOf(alice.address)).lte(parseUnits("10", usdcTokenDecimals))) {
+        if ((await usdcToken.balanceOf(alice.address)).lte(parseUnits("5", usdcTokenDecimals))) {
             console.log("Transferring USDC to Alice");
-            await usdcToken.transfer(alice.address, parseUnits("10", usdcTokenDecimals));
+            await usdcToken.transfer(alice.address, parseUnits("5", usdcTokenDecimals));
         }
 
         await Promise.all([
+            bridge.deployed(),
             strategy.deployed(),
             xassetProxy.deployed(),
         ]);
@@ -212,24 +257,6 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
     }
 
     beforeEach(async () => {
-
-        // console.log(networkConfig.networks?.hardhat?.forking);
-
-        // reset fork
-        if (network.name=="hardhat") {
-            await network.provider.request({
-                method: "hardhat_reset",
-                params: [
-                    {
-                        forking: {
-                            jsonRpcUrl: networkConfig.networks?.hardhat?.forking?.url,
-                            blockNumber: hardhatConfig.networks?.hardhat?.forking?.blockNumber
-                        },
-                    },
-                ],
-            });
-        }
-
         // Let's set up the XASSET contracts
         await initialize();
         // await initializeAndConnectToExistingContracts();
@@ -242,47 +269,39 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         })
     });
 
-    describe('Test Macros Contract via proxy', () => {
-        it('should be able to call a function via proxy', async () => {
-
-            await macroTest(owner, usdc("10"));
-
-        })
-    });
-
-
     async function withdrawHalfShares(owner: SignerWithAddress) {
-        // const valueBeforeWithdraw = await xAsset.getTotalValueOwnedBy(owner.address);
-
-        let ownedShares = await xAsset.getTotalSharesOwnedBy(owner.address);
-        console.log('ownedShares', web3.utils.fromWei(ownedShares.toString()));
-        const halfOwnedShares = ownedShares.div(BigNumber.from(2));
+        let ownedSharesBefore = await xAsset.getTotalSharesOwnedBy(owner.address);
+        console.log('ownedShares', web3.utils.fromWei(ownedSharesBefore.toString()));
+        const halfOwnedShares = ownedSharesBefore.div(BigNumber.from(2));
 
         // withdraw half of the shares
         await withdraw(owner, halfOwnedShares);
-        // TODO: check balances!!!!
-
-        ownedShares = await xAsset.getTotalSharesOwnedBy(owner.address);
-        console.log('ownedShares after', web3.utils.fromWei(ownedShares.toString()));
-
-        expect(ownedShares.sub(halfOwnedShares).abs()).to.be.lt(2);
     }
 
     describe('Invest', () => {
 
         it('should allow users to invest a specific token amount', async () => {
 
-            // print owner balance of usdc
-            const ownerBalance = await usdcToken.balanceOf(owner.address);
-            console.log('ownerBalance', web3.utils.fromWei(ownerBalance.toString()));
-
             const sharesBefore = await shareToken.totalSupply();
-            await invest(owner, usdc("2"));
+            await invest(owner, usdc("1"));
             const sharesAfter = await shareToken.totalSupply();
-            const valueAfter = await xAsset.getTotalValueOwnedBy(owner.address);
-            console.log('valueAfter', web3.utils.fromWei(valueAfter.toString()));
 
-            expect(sharesAfter).to.greaterThan(sharesBefore);
+            expect(sharesAfter.sub(sharesBefore)).to.be.eq(BigNumber.from("8264462809917355371"));
+        })
+
+        it('should allow users to invest multiple tokens', async () => {
+
+            let sharesBefore = await shareToken.totalSupply();
+            await invest(owner, usdc("1"));
+            let sharesAfter = await shareToken.totalSupply();
+
+            expect(sharesAfter.sub(sharesBefore)).to.be.eq(BigNumber.from("8264462809917355371"));
+
+            sharesBefore = await shareToken.totalSupply();
+            await invest(owner, usdt("1"), baseWalletsAndTokens.usdtToken?.address);
+            sharesAfter = await shareToken.totalSupply();
+
+            expect(sharesAfter.sub(sharesBefore)).to.be.eq(BigNumber.from("8264462809917355371"));
         })
 
         it('should allow multiple users to invest a specific token amount', async () => {
@@ -292,84 +311,75 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
             await invest(john, amount);
             const sharesAfter = await shareToken.totalSupply();
 
-            expect(sharesAfter).to.greaterThan(sharesBefore);
+            expect(sharesAfter.sub(sharesBefore)).to.be.eq(BigNumber.from("8264462809917355371"));
 
             await invest(alice, amount);
             const sharesAfter2 = await shareToken.totalSupply();
 
-            expect(sharesAfter2).to.greaterThan(sharesAfter);
-        })
-
-        it('should allocate shares for the specific investment', async () => {
-            const amount = usdc("1");
-
-            const sharesBefore = await xAsset.getTotalSharesOwnedBy(john.address);
-            await invest(john, amount);
-            const sharesAfter = await xAsset.getTotalSharesOwnedBy(john.address);
-
-            expect(sharesAfter).to.greaterThan(sharesBefore);
+            expect(sharesAfter2.sub(sharesAfter)).to.be.eq(BigNumber.from("8264462809917355371"));
         })
 
         it('should calculate price per share with no investments in the XASSET', async () => {
             const sharePrice = await xAsset.getSharePrice();
 
-            expect(sharePrice).to.greaterThan("0");
+            expect(sharePrice).to.be.eq(BigNumber.from("121000000000000000"));
         })
 
         it('should revert if not using proxy', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
 
             expect(xAsset.connect(owner).invest(usdcToken.address, amount)).to.be.revertedWith('ERC20: transfer amount exceeds balance');
         })
 
         it('should not revert if using proxy', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
 
             console.log('owner address:', owner.address);
             await invest(owner, amount);
         })
 
         it('should calculate price per share', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
             const pricePerShareBefore = await xAsset.getSharePrice();
 
             await invest(owner, amount);
 
             const pricePerShareAfter = await xAsset.getSharePrice();
 
-            expect(pricePerShareBefore).to.be.gt(0);
-            expect(pricePerShareAfter).to.be.gt(0);
+            expect(pricePerShareBefore).to.be.eq(BigNumber.from("121000000000000000"));
+            expect(pricePerShareAfter).to.be.eq(pricePerShareBefore);
         })
 
         it('should return new price once a new block is mined', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
             await invest(owner, amount);
             let prices=[];
             let pricePerShareBefore = await xAsset.getSharePrice();
+            expect(pricePerShareBefore).to.eq(BigNumber.from("121000000000000000"));
             prices.push(pricePerShareBefore);
             await mine(1000);
             let pricePerShareAfter = await xAsset.getSharePrice();
             prices.push(pricePerShareAfter);
-            expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+            expect(pricePerShareBefore).to.eq(pricePerShareAfter);
             pricePerShareBefore = pricePerShareAfter;
             await mine(5000);
             pricePerShareAfter = await xAsset.getSharePrice();
             prices.push(pricePerShareAfter);
-            expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+            expect(pricePerShareBefore).to.eq(pricePerShareAfter);
             pricePerShareBefore = pricePerShareAfter;
             await mine(7000);
             pricePerShareAfter = await xAsset.getSharePrice();
             prices.push(pricePerShareAfter);
-            expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+            expect(pricePerShareBefore).to.eq(pricePerShareAfter);
             await mine(8000);
             pricePerShareAfter = await xAsset.getSharePrice();
             prices.push(pricePerShareAfter);
-            expect(pricePerShareBefore).to.not.eq(pricePerShareAfter);
+            expect(pricePerShareBefore).to.eq(pricePerShareAfter);
             console.log('Prices: ', prices);
         })
 
         it('should calculate total value locked', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
             const tvlBefore = await xAsset.getTVL();
 
             await invest(john, amount);
@@ -386,7 +396,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
         })
 
         it('should return total number of shares minted', async () => {
-            const amount = usdc("1");
+            const amount = usdc("10");
             await invest(john, amount);
 
             const totalShares = await shareToken.totalSupply();
@@ -394,7 +404,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
             expect(totalShares).to.greaterThan(0);
         })
 
-        it('should allow users to withdraw a specific amount of shares and receive an amount of tokens', async () => {
+        it('should not allow users to withdraw', async () => {
             // invest 100 tokens
             const amount = usdc("1");
             await invest(john, amount);
@@ -405,19 +415,10 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
         })
 
-        it('should allow multiple users to invest and withdraw at anytime', async () => {
+        it('should allow multiple users to invest but not withdraw at anytime', async () => {
             // invest 100 tokens
-            const amount = usdc("1");
+            const amount = usdc("0.1");
             await invest(john, amount);
-            let balanceBefore = await usdcToken.balanceOf(john.address);
-            hre.tracer.enabled = true;
-            await withdraw(john, await xAsset.getTotalSharesOwnedBy(john.address));
-            hre.tracer.enabled = false;
-            let balanceAfter = await usdcToken.balanceOf(john.address);
-            console.log('john balance before', web3.utils.fromWei(balanceBefore.toString()));
-            console.log('john balance after', web3.utils.fromWei(balanceAfter.toString()));
-            console.log('john balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
-            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
 
             await time.increase(24*3600);
 
@@ -429,13 +430,7 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
             await time.increase(24*3600);
 
-            balanceBefore = await usdcToken.balanceOf(alice.address);
             await withdraw(alice, await xAsset.getTotalSharesOwnedBy(alice.address));
-            balanceAfter = await usdcToken.balanceOf(alice.address);
-            console.log('alice balance before', web3.utils.fromWei(balanceBefore.toString()));
-            console.log('alice balance after', web3.utils.fromWei(balanceAfter.toString()));
-            console.log('alice balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
-            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
 
             await time.increase(24*3600);
 
@@ -445,13 +440,8 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
             await invest(owner, amount);
 
-            balanceBefore = await usdcToken.balanceOf(john.address);
-            console.log('john balance before', web3.utils.fromWei(balanceBefore.toString()));
             await withdrawHalfShares(john);
-            balanceAfter = await usdcToken.balanceOf(john.address);
-            console.log('john balance after', web3.utils.fromWei(balanceAfter.toString()));
-            console.log('john balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
-            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
+
         })
 
         it('should calculate the total value owned by an address', async () => {
@@ -465,34 +455,16 @@ describe.only("MagpieXYZProtocol XAssets", async () => {
 
             // calculate how many $ the user has after investing
             const valueOwnedAfter = await xAsset.getTotalValueOwnedBy(john.address);
-            let diff = valueOwnedAfter.sub(valueOwnedBefore.add(amount));
 
-            expect(diff).to.be.lte(1000);
+            expect(valueOwnedAfter.sub(valueOwnedBefore).sub(amount).abs()).to.be.lte(2);
         })
 
         it('should calculate the amount of shares received for a specified token and amount', async () => {
             const amount = usdc("1");
             const shares = await xAsset.estimateSharesForInvestmentAmount(usdcToken.address, amount);
 
-            expect(shares).to.greaterThan("0");
+            expect(shares).to.eq(BigNumber.from("8264462809917355371"));
         })
-
-        it.only('should test withdrawal on mainnet', async () => {
-            // invest 100 tokens
-            const amount = usdc("25");
-            await invest(owner, amount);
-            let balanceBefore = await usdcToken.balanceOf(owner.address);
-            // hre.tracer.enabled = true;
-            await withdraw(owner, await xAsset.getTotalSharesOwnedBy(owner.address));
-            // hre.tracer.enabled = false;
-            let balanceAfter = await usdcToken.balanceOf(owner.address);
-            console.log('owner balance before', web3.utils.fromWei(balanceBefore.toString()));
-            console.log('owner balance after', web3.utils.fromWei(balanceAfter.toString()));
-            console.log('owner balance diff', web3.utils.fromWei(balanceAfter.sub(balanceBefore).toString()));
-            expect(balanceAfter.sub(balanceBefore)).to.be.gt(0);
-        })
-
-
 
     });
 }).timeout(1000000000);

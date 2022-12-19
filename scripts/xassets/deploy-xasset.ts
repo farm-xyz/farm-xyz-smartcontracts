@@ -268,7 +268,7 @@ async function deployXAsset(xAssetData: { name: string, ticker: string, stableCo
         } else {
             console.log("Initial investment sum already transferred to XAssetBase");
         }
-        await xasset.executeInitialInvestment();
+        await xasset["executeInitialInvestment()"]();
         saveXAssetValue(xAssetData, 'XAssetBaseSetup', true);
         console.log("XAssetBase setup complete");
     } else {

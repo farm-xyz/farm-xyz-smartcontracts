@@ -1,13 +1,10 @@
 {
-  "FarmFixedRiskWallet": "0xa4F4f67b48Ed58C7Bd45197bE0B0dEcfe112f456",
-  "FarmFixedRiskWalletInitialised": true,
-  "FarmXYZPlatformBridge": "0x8bE8bb82598da00f867925844516A31DEd1070ba",
-  "FarmXYZStrategy": "0xFD8d052A2Ffa476e3239521383992856B4f912BD",
-  "XAssetShareToken": "0xC6F99f83FbD66b41cC07338D1864507bEF369477",
-  "XAssetMacros": "0xEcB8Fd8a34FF859745a0F0fFd5048e195C6F1DAb",
-  "XAssetBase": "0x0416fD0A193b5a0BE3d26e733039A85c21B58637",
+  "MagpieStrategy": "0x0b747D33e7E3186684f46732DB9CfFD0bEE2f2E6",
+  "XAssetShareToken": "0x5b33beAE8036A854B33592b919C67454f9dA9872",
+  "XAssetMacros": "0xA36503065064170F950FC0861Ac63aC08973d92B",
+  "XAssetBase": "0xc6c7475B8BdE89D3717179A3Fe2468946E576874",
   "XAssetBaseInitialised": true,
   "upgrade": {
-    "XAssetBase": true
+    "XAssetBase": false
   }
 }

@@ -78,41 +78,6 @@ describe.only("FarmXYZProtocol XAssets", async () => {
         fs.writeFileSync('config.json', configJson);
     }
 
-    // noinspection JSUnusedLocalSymbols
-    async function initializeAndConnectToExistingContracts()
-    {
-        [owner, john, alice] = await ethers.getSigners();
-        const ERC20Factory = await ethers.getContractFactory("ERC20");
-        usdcToken = await ERC20Factory.attach('0x85111aF7Af9d768D928d8E0f893E793625C00bd1');
-        usdcTokenDecimals = 18; //baseWalletsAndTokens.usdcTokenDecimals;
-        const registry: PRBProxyRegistry = getPRBProxyRegistry(owner);
-
-        setBaseWalletsAndTokens({usdcToken, usdcTokenDecimals, registry, owner, john, alice});
-
-        ownerProxy = await getProxyForSigner(owner);
-
-        totalRewardPool = usdc("1000000");
-
-        // Then let's initialize the reward farm
-
-        // Now let's initialize the XAsset
-        // const FarmXYZPlatformBridge = await ethers.getContractFactory("FarmXYZPlatformBridge");
-        // const FarmXYZStrategy = await ethers.getContractFactory("FarmXYZStrategy");
-        const XAssetBase = await ethers.getContractFactory("XAssetBase");
-        const XAssetShareToken = await ethers.getContractFactory("XAssetShareToken");
-        const XAssetMacros = await ethers.getContractFactory("XAssetMacros");
-
-        const xassetProxy = await XAssetBase.attach("0x0416fD0A193b5a0BE3d26e733039A85c21B58637") as XAssetBase;
-        xassetMacros = await XAssetMacros.attach("0xEcB8Fd8a34FF859745a0F0fFd5048e195C6F1DAb") as XAssetMacros;
-        shareToken = await XAssetShareToken.attach(await xassetProxy.shareToken()) as XAssetShareToken;
-
-        await Promise.all([
-            xassetProxy.deployed(),
-        ]);
-
-        xAsset = xassetProxy as XAssetBase;
-    }
-
     async function initialize() {
         readConfig();
         let baseWalletsAndTokens = await initializeBaseWalletsAndTokens();
@@ -245,7 +210,7 @@ describe.only("FarmXYZProtocol XAssets", async () => {
             await _shareToken.setXAsset(xassetProxy.address);
             await (xassetProxy as XAssetBase).setStrategy(strategy.address);
             await usdcToken.transfer(xassetProxy.address, usdc("10"));
-            await (xassetProxy as XAssetBase).executeInitialInvestment();
+            await (xassetProxy as XAssetBase)["executeInitialInvestment()"]();
             config['XAssetBaseInitialised'] = true;
             saveConfig();
         }

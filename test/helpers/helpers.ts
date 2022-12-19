@@ -25,7 +25,9 @@ type BaseWalletsAndTokens = {
   registry: PRBProxyRegistry,
   owner:SignerWithAddress,
   john: SignerWithAddress,
-  alice: SignerWithAddress
+  alice: SignerWithAddress,
+  usdtToken: ERC20,
+  usdtTokenDecimals:number,
 };
 
 
@@ -39,7 +41,9 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
   const ERC20Factory = await ethers.getContractFactory("ERC20");
 
   let usdcToken:ERC20;
+  let usdtToken:ERC20;
   let usdcTokenDecimals = 18;
+  let usdtTokenDecimals = 18;
   if (hre.network.name === "hardhat") {
     /*
     // This is used for the Polygon mumbai fork
@@ -53,7 +57,9 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
     */
 
     // This is used for the BSC mainnet fork
-    usdcToken = ERC20Factory.attach("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
+    usdcToken = ERC20Factory.attach("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"); // USDC
+    // usdcToken = ERC20Factory.attach("0x55d398326f99059fF775485246999027B3197955"); // USDT
+    usdtToken = ERC20Factory.attach("0x55d398326f99059fF775485246999027B3197955"); // USDT
     usdcTokenDecimals = await usdcToken.decimals();
     // await setTokenBalance("USDC", owner.address, parseUnits("102000000", usdcTokenDecimals));
     await usdcToken.connect(owner).transfer(john.address,  parseUnits("2", usdcTokenDecimals));
@@ -61,18 +67,28 @@ export async function initializeBaseWalletsAndTokens():Promise<BaseWalletsAndTok
 
   } else if (hre.network.name == "mumbai") {
     usdcToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20;
+    usdtToken = await ERC20Factory.attach("0x85111aF7Af9d768D928d8E0f893E793625C00bd1") as ERC20; // ????
     usdcTokenDecimals = await usdcToken.decimals();
     // await usdcToken.connect(owner).(owner.address, parseUnits("102000000", 6));
+  } else if (hre.network.name == "bsc") {
+    usdcToken = await ERC20Factory.attach("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d") as ERC20;
+    usdtToken = await ERC20Factory.attach("0x55d398326f99059fF775485246999027B3197955") as ERC20;
+    usdcTokenDecimals = await usdcToken.decimals();
   } else {
     const TestTokenFactory = await ethers.getContractFactory("TestToken");
     usdcToken = await TestTokenFactory.deploy("Test USDC", "USDC") as ERC20;
+    usdtToken = await TestTokenFactory.deploy("Test USDT", "USDT") as ERC20;
   }
 
 
   // Start with PRBProxy initialization
   const registry: PRBProxyRegistry = getPRBProxyRegistry(owner);
 
-  baseWalletsAndTokens = {usdcToken, usdcTokenDecimals, registry, owner, john, alice};
+  baseWalletsAndTokens = {
+    usdcToken, usdcTokenDecimals,
+    registry, owner, john, alice,
+    usdtToken, usdtTokenDecimals
+  };
   return baseWalletsAndTokens;
 }
 
@@ -83,6 +99,11 @@ export function setBaseWalletsAndTokens(bw: BaseWalletsAndTokens) {
 export function usdc(amount:string) {
   return parseUnits(amount, baseWalletsAndTokens.usdcTokenDecimals);
 }
+
+export function usdt(amount:string) {
+  return parseUnits(amount, baseWalletsAndTokens.usdtTokenDecimals);
+}
+
 
 export async function getProxyForSigner(signer:SignerWithAddress) {
   if (proxyList[signer.address]) {

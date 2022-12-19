@@ -158,7 +158,7 @@ function unsetConfigKeys(keys:string[]) {
     saveConfig();
 }
 
-async function deployMagpieXAsset(xAssetData: { name: string, ticker: string, stableCoin:ERC20, magpieHelper: string },
+async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: string, stableCoin:ERC20, magpieHelper: string },
                             resume: boolean = false) {
 
     console.group('Deploying XAsset', xAssetData.name);
@@ -328,7 +328,7 @@ async function main() {
     ];
 
     for (let i = 0; i < xAssetsData.length; i++) {
-        await deployMagpieXAsset(xAssetsData[i], true);
+        await deployFarmInvestmentXAsset(xAssetsData[i], true);
     }
 
 }

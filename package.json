@@ -12,6 +12,7 @@
     "firebase-admin": "^11.2.0",
     "hardhat": "^2.8.0",
     "hardhat-preprocessor": "^0.1.5",
+    "hardhat-tracer": "^1.2.0",
     "moment": "^2.29.4"
   },
   "devDependencies": {
