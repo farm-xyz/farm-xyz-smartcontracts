@@ -19,6 +19,8 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
 
     string public name;
 
+    address public xAsset;
+
     IXPlatformBridge private _bridge;
 
     IFarmXYZPool private _farm;
@@ -55,7 +57,7 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
         address token,
         uint256 amount,
         uint256 minAmount
-    ) nonReentrant whenNotPaused override external returns (uint256) {
+    ) nonReentrant whenNotPaused onlyXAsset override external returns (uint256) {
         require(amount>=minAmount, "FarmXYZStrategy: amount is less than minAmount"); // silence unused param warning
         require(IERC20(token).transferFrom(msg.sender, address(this), amount), "ERC20: transferFrom failed");
         if (IERC20(token).allowance(address(this), address(_farm)) < amount) {
@@ -69,7 +71,7 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
     function withdraw(
         uint256 amount,
         uint256 minAmount
-    ) nonReentrant whenNotPaused override external returns (uint256) {
+    ) nonReentrant whenNotPaused onlyXAsset override external returns (uint256) {
         uint256 balanceBefore = IERC20(_baseToken).balanceOf(address(this));
         _farm.unstake(address(_baseToken), amount);
         uint256 balanceAfter = IERC20(_baseToken).balanceOf(address(this));
@@ -89,8 +91,46 @@ contract FarmXYZStrategy is IXStrategy, ReentrancyGuardUpgradeable, PausableUpgr
         return _farm.getUserBalance(address(this));
     }
 
-    function compound() override external {
+    function compound() nonReentrant whenNotPaused override external {
         _farm.compoundYield();
+    }
+
+    /**
+     * @notice pause strategy, restricting certain operations
+     */
+    function pause() external nonReentrant onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice unpause strategy, enabling certain operations
+     */
+    function unpause() external nonReentrant onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @dev Transfers ownership of the contract to a new xAsset (`newXasset`).
+     * Can only be called by the current owner.
+     */
+    function setXAsset(address newXasset) public virtual onlyOwner {
+        require(newXasset != address(0), "xAsset address can not be zero address");
+        xAsset = newXasset;
+    }
+
+    /**
+     * @dev Throws if called by any account other than the xAsset contract.
+     */
+    modifier onlyXAsset() {
+        _checkXAsset();
+        _;
+    }
+
+    /**
+     * @dev Throws if the sender is not the owner.
+     */
+    function _checkXAsset() internal view virtual {
+        require(xAsset == _msgSender(), "Caller is not the xAsset contract");
     }
 
 }

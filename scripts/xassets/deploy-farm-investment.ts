@@ -6,34 +6,12 @@ import hre = require("hardhat");
 import {timeout} from "../../test/helpers/utils";
 import {getPRBProxyRegistry, PRBProxyRegistry} from "@prb/proxy";
 import fs, {readFileSync} from "fs";
+import {usdc} from "../../test/helpers/helpers";
+
+let proxyRegistryAddress: string = "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63";
 
 let stableCoins:{ [key: string]: { [key: string]: any } } = {
-    'hardhat': { // hardhat clone of polygon mainnet
-        'USDC': {
-            address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-            contract: null
-        },
-        'USDT': {
-            address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
-            contract: null
-        },
-        'DAI': {
-            address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-            contract: null
-        },
-        'FRAX': {
-            address: '0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89',
-            contract: null
-        },
-        'agEUR': {
-            address: '0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4',
-            contract: null
-        },
-        'miMATIC': {
-            address: '0xa3Fa99A148fA48D14Ed51d610c367C61876997F1',
-            contract: null
-        }
-    },
+    'hardhat': { /* will be updated from main */ },
     'polygon': { // polygon mainnet
         'USDC': {
             address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
@@ -110,7 +88,7 @@ let config: { [key: string]: { [key: string]: any } } = {};
 
 function readConfig() {
     try {
-        let configJson = readFileSync('deploy-magpie.json', 'utf-8');
+        let configJson = readFileSync('deploy-farmx-token.json', 'utf-8');
         config = JSON.parse(configJson);
     } catch (e) {
         config = {};
@@ -119,7 +97,7 @@ function readConfig() {
 
 function saveConfig() {
     let configJson = JSON.stringify(config, null, 2);
-    fs.writeFileSync('deploy-magpie.json', configJson);
+    fs.writeFileSync('deploy-farmx-token.json', configJson);
 }
 
 function saveValue(key:string, value:any) {
@@ -158,7 +136,7 @@ function unsetConfigKeys(keys:string[]) {
     saveConfig();
 }
 
-async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: string, stableCoin:ERC20, magpieHelper: string },
+async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: string, stableCoins:ERC20[] },
                             resume: boolean = false) {
 
     console.group('Deploying XAsset', xAssetData.name);
@@ -169,37 +147,79 @@ async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: st
                             'latest_XAssetShareToken', 'latest_XAssetBase', 'latest_XAssetBaseSetup']);
     saveValue('latest_ticker', xAssetData.ticker);
 
-    let usdcToken = xAssetData.stableCoin;
+    let usdcToken = xAssetData.stableCoins[0];
 
-    const MagpieStrategyFactory = await ethers.getContractFactory("MagpieStrategyV2");
+    const FarmInvestableWalletFactory = await ethers.getContractFactory("FarmInvestableWallet");
+    const FarmXYZStrategyFactory = await ethers.getContractFactory("FarmXYZStrategy");
+    const FarmXYZPlatformBridgeFactory = await ethers.getContractFactory("FarmXYZPlatformBridge");
     const XAssetBaseFactory = await ethers.getContractFactory("XAssetBase");
     const XAssetShareTokenFactory = await ethers.getContractFactory("XAssetShareToken");
 
+    let bridge;
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZPlatformBridge') == null) {
+        console.log("Deploying FarmXYZPlatformBridge...");
+        bridge = await upgrades.deployProxy(FarmXYZPlatformBridgeFactory, [], {kind: "uups"});
+        await bridge.deployed();
+        console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
+        saveXAssetValue(xAssetData, 'FarmXYZPlatformBridge', bridge.address);
+    } else {
+        console.log("FarmXYZPlatformBridge already deployed");
+        bridge = FarmXYZPlatformBridgeFactory.attach(getXAssetValue(xAssetData, 'FarmXYZPlatformBridge'));
+    }
+
+    let wallet;
+    if (resume && getXAssetValue(xAssetData, 'FarmInvestableWallet') == null) {
+        console.log("Deploying FarmInvestableWallet...");
+        wallet = await upgrades.deployProxy(FarmInvestableWalletFactory,
+            [ ],
+            {kind: "uups"});
+        await wallet.deployed();
+        saveXAssetValue(xAssetData, 'FarmInvestableWallet', wallet.address);
+        console.log("FarmInvestableWallet deployed to:", wallet.address);
+    } else {
+        console.log("FarmInvestableWallet already deployed");
+        wallet = FarmInvestableWalletFactory.attach(getXAssetValue(xAssetData, 'FarmInvestableWallet'));
+    }
+
+    if (resume && getXAssetValue(xAssetData, 'FarmInvestableWalletInitialised') == null) {
+        let tx = await wallet.setWhitelistEnabled(true);
+        await tx.wait();
+        // tx = await strategy.addToWhitelist([owner.address]);
+        // await tx.wait();
+        let stableCoinAddresses = xAssetData.stableCoins.map((stableCoin) => stableCoin.address);
+        tx = await wallet.addToTokenWhitelist(stableCoinAddresses);
+        saveXAssetValue(xAssetData, 'FarmFixedRiskWalletInitialised', true);
+    }
 
     let strategy;
-    if (resume && getXAssetValue(xAssetData, 'MagpieStrategy') == null) {
-        console.log("Deploying MagpieStrategy...");
-        strategy = await upgrades.deployProxy(MagpieStrategyFactory,
-            [
-                usdcToken.address, // baseToken
-                xAssetData.magpieHelper, // magpieHelper
-                "0x312Bc7eAAF93f1C60Dc5AfC115FcCDE161055fb0", // magpiePool
-                "0xAD6742A35fB341A9Cc6ad674738Dd8da98b94Fb1" // womToken
-            ],
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZStrategy') == null) {
+        console.log("Deploying FarmXYZStrategy...");
+        strategy = await upgrades.deployProxy(FarmXYZStrategyFactory,
+            [bridge.address, wallet.address, usdcToken.address],
             {kind: "uups"});
         await strategy.deployed();
-        saveXAssetValue(xAssetData, 'MagpieStrategy', strategy.address);
-        console.log("MagpieStrategy deployed to:", strategy.address);
+        saveXAssetValue(xAssetData, 'FarmXYZStrategy', strategy.address);
+        console.log("FarmXYZStrategy deployed to:", strategy.address);
     } else {
-        console.log("MagpieStrategy already deployed");
-        strategy = MagpieStrategyFactory.attach(getXAssetValue(xAssetData, 'MagpieStrategy'));
+        console.log("FarmXYZStrategy already deployed");
+        strategy = FarmXYZStrategyFactory.attach(getXAssetValue(xAssetData, 'FarmXYZStrategy'));
+    }
+
+    if (resume && getXAssetValue(xAssetData, 'FarmXYZStrategyWhitelisted') == null) {
+        console.log("Adding FarmXYZStrategy to whitelist..");
+        let tx = await wallet.addToWhitelist([strategy.address]);
+        await tx.wait();
+        saveXAssetValue(xAssetData, 'FarmXYZStrategyWhitelisted', true);
+        console.log("FarmXYZStrategy added to whitelist.");
+    } else {
+        console.log("FarmXYZStrategy already whitelisted");
     }
 
     let shareToken:XAssetShareToken;
     if (resume && getXAssetValue(xAssetData, 'XAssetShareToken') == null) {
         console.log("Deploying XAssetShareToken...");
         shareToken = await upgrades.deployProxy(XAssetShareTokenFactory,
-            [xAssetData.name, xAssetData.ticker, "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
+            [xAssetData.name, xAssetData.ticker, proxyRegistryAddress],
             {kind: "uups"}) as XAssetShareToken;
         await shareToken.deployed();
         saveXAssetValue(xAssetData, 'XAssetShareToken', shareToken.address);
@@ -213,7 +233,7 @@ async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: st
     if (resume && getXAssetValue(xAssetData, 'XAssetBase') == null) {
         console.log("Deploying XAssetBase...");
         xasset = await upgrades.deployProxy(XAssetBaseFactory,
-            [xAssetData.ticker, usdcToken.address, shareToken.address, "0x43fA1CFCacAe71492A36198EDAE602Fe80DdcA63"],
+            [xAssetData.ticker, usdcToken.address, shareToken.address, proxyRegistryAddress],
             {kind: "uups"}) as XAssetBase;
         await xasset.deployed();
         saveXAssetValue(xAssetData, 'XAssetBase', xasset.address);
@@ -234,7 +254,8 @@ async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: st
             try { let tx = await strategy.setXAsset(xasset.address); await tx.wait(); } catch (e) { console.log("Setting XAsset on strategy failed, moving on"); }
         }
         try { let tx = await xasset.setStrategy(strategy.address); await tx.wait(); } catch(e) { console.log("Setting strategy on xasset failed, moving on"); }
-        let initialInvestmentSum = parseUnits("10", await usdcToken.decimals());
+        try { let tx = await xasset.setAcceptedPriceDifference(100); await tx.wait(); } catch(e) { console.log("Setting acceptedPriceDifference on xasset failed, moving on"); }
+        let initialInvestmentSum = parseUnits("0.121", await usdcToken.decimals());
         if ((await usdcToken.balanceOf(xasset.address)).lt(initialInvestmentSum) ) {
             console.log("Transferring initial investment sum to XAssetBase...");
             let tx = await usdcToken.transfer(xasset.address, initialInvestmentSum);
@@ -243,7 +264,8 @@ async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: st
         } else {
             console.log("Initial investment sum already transferred to XAssetBase");
         }
-        await xasset["executeInitialInvestment()"]();
+        let tx = await xasset["executeInitialInvestment(uint256,uint256)"](initialInvestmentSum, parseUnits("1", await shareToken.decimals()));
+        await tx.wait();
         saveXAssetValue(xAssetData, 'XAssetBaseSetup', true);
         console.log("XAssetBase setup complete");
     } else {
@@ -251,8 +273,11 @@ async function deployFarmInvestmentXAsset(xAssetData: { name: string, ticker: st
     }
 
     console.log("Base Token deployed to:", usdcToken.address);
-    console.log("MagpieStrategy deployed to:", strategy.address);
+    console.log("Wallet deployed to:", wallet.address);
+    console.log("FarmXYZPlatformBridge deployed to:", bridge.address);
+    console.log("FarmXYZStrategy deployed to:", strategy.address);
     console.log("XAssetBase deployed to:", xasset.address);
+    console.log("XAsset price:", await xasset.getSharePrice());
 
     console.groupEnd();
 }
@@ -263,7 +288,8 @@ async function main() {
     console.log("Deploying to network: ", hre.network.name);
 
     if (hre.network.name == 'hardhat') {
-        config[hre.network.name] = config['polygon'];
+        config[hre.network.name] = config['bsc'];
+        stableCoins[hre.network.name] = stableCoins['bsc'];
     }
 
     const [ owner ] = await ethers.getSigners();
@@ -272,19 +298,6 @@ async function main() {
     for(let [key, token] of Object.entries(stableCoins[hre.network.name])) {
         stableCoins[hre.network.name][key].contract = ERC20Factory.attach(token.address);
     }
-
-    // <editor-fold desc="// Deploy Test Token">
-    // if (false) { // Deploy a test token to be used as stableCoin
-    //     console.log("Deploying TestUSDC...");
-    //     const TestTokenFactory = await ethers.getContractFactory("TestToken");
-    //     usdcToken = await TestTokenFactory.deploy("Test: USDC Coin", "USDC");
-    //     await usdcToken.deployed();
-    //     console.log("TestUSDC deployed to:", usdcToken.address);
-    //
-    //     console.log("Minting some TestUSDC...");
-    //     await usdcToken.mint(owner.address, parseUnits("1000000000", await usdcToken.decimals()));
-    // }
-    // </editor-fold>
 
     let xassetMacros;
     const XAssetMacrosFactory = await ethers.getContractFactory("XAssetMacros");
@@ -302,29 +315,15 @@ async function main() {
 
     let xAssetsData = [
         {
-            name: "X[MGP]-BUSD",
-            ticker: "X[MGP]-BUSD",
-            stableCoin: stableCoins[hre.network.name]['BUSD'].contract,
-            magpieHelper: "0xC4a2B6de728B1E76D2F7178bF8AB3df458dF4C92"
-        },
-        {
-            name: "X[MGP]-USDT",
-            ticker: "X[MGP]-USDT",
-            stableCoin: stableCoins[hre.network.name].USDT.contract,
-            magpieHelper: "0x1aa1E18FAFAe4391FF33dFBE6198dc84B9541D77"
+            name: "FARMX Seed Allocation XASSET",
+            ticker: "X-FARMX-SEED",
+            stableCoins: [
+                stableCoins[hre.network.name]['USDC'].contract,
+                stableCoins[hre.network.name]['USDT'].contract,
+                stableCoins[hre.network.name]['DAI'].contract,
+                stableCoins[hre.network.name]['BUSD'].contract,
+            ]
         }
-        // {
-        //     name: "X[MGP]-DAI",
-        //     ticker: "X[MGP]-DAI",
-        //     stableCoin: stableCoins[hre.network.name].DAI.contract,
-        //     magpieHelper: "0xB8fcc8aC3aB0eb77ab43aA3C5483234CB10e5a73"
-        // },
-        // {
-        //     name: "X[MGP]-USDC",
-        //     ticker: "X[MGP]-USDC",
-        //     stableCoin: stableCoins[hre.network.name].USDC.contract,
-        //     magpieHelper: "0xb68F5247f31fe28FDe0b0F7543F635a4d6EDbD7F"
-        // }
     ];
 
     for (let i = 0; i < xAssetsData.length; i++) {

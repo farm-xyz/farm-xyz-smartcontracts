@@ -195,7 +195,6 @@ contract MagpieStrategyV2 is IXStrategy, OwnableUpgradeable, ReentrancyGuardUpgr
      * Can only be called by the current owner.
      */
     function setXAsset(address newXasset) public virtual onlyOwner {
-        require(xAsset == address(0), "XAsset already set");
         require(newXasset != address(0), "xAsset address can not be zero address");
         xAsset = newXasset;
     }

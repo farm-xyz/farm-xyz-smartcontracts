@@ -124,7 +124,6 @@ describe.only("FarmXYZ Investments XAssets", async () => {
 
 
         // Then let's initialize the reward farm
-
         let farmXYZFarm;
         if (!forceRedeploy && config['FarmInvestableWallet']) {
             farmXYZFarm = FarmInvestableWalletFactory.attach(config['FarmInvestableWallet']) as FarmInvestableWallet;
@@ -214,6 +213,7 @@ describe.only("FarmXYZ Investments XAssets", async () => {
 
         if (forceRedeploy || !config['XAssetBaseInitialised']) {
             await _shareToken.setXAsset(xassetProxy.address);
+            await strategy.setXAsset(xassetProxy.address);
             await (xassetProxy as XAssetBase).setStrategy(strategy.address);
             await (xassetProxy as XAssetBase).setAcceptedPriceDifference(100);
             await usdcToken.transfer(xassetProxy.address, usdc("1"));
